@@ -111,7 +111,7 @@ def formatar_data(data_str):
         return str(data_str)
 
 def carregar_dados_da_planilha():
-    planilha_path = r'C:\dashboard_auditoria\data\base_auditoria.xlsx'
+planilha_path = 'base_auditoria.xlsx'
     if not os.path.exists(planilha_path):
         print("❌ Planilha não encontrada: data/base_auditoria.xlsx")
         return None, None, None, None
@@ -755,3 +755,4 @@ def atualizar_conteudo_principal(ano, mes, unidade):
 if __name__ == '__main__':
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
     app.run(debug=True, host='0.0.0.0', port=8050)
+
