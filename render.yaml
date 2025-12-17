@@ -1,11 +1,10 @@
 services:
   - type: web
-    name: dashboardauditorialm
+    name: seu-novo-servico-aqui
     runtime: python
     plan: free
     region: oregon
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:server
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.13
+    python:
+      version: "3.10.13"
