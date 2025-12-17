@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: seu-novo-servico-aqui
+    name: dashboard-auditoria-novo
     runtime: python
     plan: free
     region: oregon
