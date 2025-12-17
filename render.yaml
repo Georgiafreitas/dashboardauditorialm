@@ -2,8 +2,10 @@ services:
   - type: web
     name: Dashboard_Auditoria
     runtime: python
-    pythonVersion: "3.10.13"  # **Chave alterada aqui**
     plan: free
     region: oregon
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:server
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.13"
