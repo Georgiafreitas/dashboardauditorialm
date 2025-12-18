@@ -4,10 +4,19 @@ import plotly.express as px
 import os
 import unicodedata
 from datetime import datetime
+import dash_auth  # Importação para autenticação
 
 print("🚀 Iniciando Dashboard de Auditoria...")
 
-# ---------- Helpers ----------
+# ========== CONFIGURAÇÃO DE AUTENTICAÇÃO ==========
+# Defina os usuários e senhas aqui
+# Formato: 'usuário': 'senha'
+USUARIOS_VALIDOS = {
+    'admin': 'wne@2026',    # ALTERE PARA SUA SENHA SEGURA
+    'diretoria': 'lagoa@2026'     # ALTERE PARA SUA SENHA SEGURA
+}
+
+# ========== HELPERS ==========
 def normalize_colname(name: str) -> str:
     if not isinstance(name, str):
         return name
@@ -119,12 +128,15 @@ def carregar_dados_da_planilha():
     try:
         print(f"📁 Carregando dados da planilha: {planilha_path}")
 
-          # MODIFIQUE AS LINHAS ABAIXO:
-        # Adicione engine='openpyxl' e dtype=str para evitar erros de parsing
-        df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', engine='openpyxl', dtype=str)
-        df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', engine='openpyxl', dtype=str)
-        df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco', engine='openpyxl', dtype=str)
-        df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica', engine='openpyxl', dtype=str)
+        # CORREÇÃO CRÍTICA: Adicionado engine='openpyxl' e dtype=str para evitar erro "O valor deve ser numérico ou uma string contendo curinga"
+        df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', 
+                                     engine='openpyxl', dtype=str)
+        df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', 
+                                     engine='openpyxl', dtype=str)
+        df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco', 
+                                 engine='openpyxl', dtype=str)
+        df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica', 
+                                     engine='openpyxl', dtype=str)
 
         print("✅ Leitura inicial da planilha concluída. Processando dados...")
 
@@ -155,9 +167,11 @@ def carregar_dados_da_planilha():
 
     except Exception as e:
         print(f"❌ Erro ao carregar planilha: {e}")
+        import traceback
+        traceback.print_exc()  # Mostra detalhes completos do erro
         return None, None, None, None
 
-# ---------- Funções utilitárias ----------
+# ========== FUNÇÕES UTILITÁRIAS ==========
 def obter_anos_disponiveis(df_checklist):
     if df_checklist is None or 'Ano' not in df_checklist.columns:
         return []
@@ -176,7 +190,7 @@ def obter_meses_disponiveis(df_checklist, ano_selecionado):
                    7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',11:'Novembro',12:'Dezembro'}
     return [{'label': f'{nomes_meses.get(int(m), str(m))}', 'value': int(m)} for m in meses]
 
-# ---------- Carregar dados ----------
+# ========== CARREGAR DADOS ==========
 df_checklist, df_politicas, df_risco, df_melhorias = carregar_dados_da_planilha()
 if df_checklist is None:
     app = Dash(__name__)
@@ -188,17 +202,24 @@ if df_checklist is None:
 
 anos_disponiveis = obter_anos_disponiveis(df_checklist)
 
-# ---------- App ----------
+# ========== APP DASH ==========
 app = Dash(__name__)
 
+# ========== APLICAR AUTENTICAÇÃO ==========
+# Esta linha DEVE vir DEPOIS de criar a app e ANTES do layout
+auth = dash_auth.BasicAuth(app, USUARIOS_VALIDOS)
+
+# ========== LAYOUT DO DASHBOARD ==========
 app.layout = html.Div([
-    html.Div([html.H1("📊 DASHBOARD DE AUDITORIA", style={'textAlign':'center', 'marginBottom':'20px'})]),
+    html.Div([html.H1("📊 DASHBOARD DE AUDITORIA", 
+                      style={'textAlign':'center', 'marginBottom':'20px'})]),
     html.Div([
         html.Div([
             html.Label("Ano:"),
             dcc.Dropdown(
                 id='filtro-ano',
-                options=[{'label':'Todos','value':'todos'}]+[{'label':str(a),'value':a} for a in anos_disponiveis],
+                options=[{'label':'Todos','value':'todos'}]+
+                       [{'label':str(a),'value':a} for a in anos_disponiveis],
                 value='todos'
             )
         ], style={'marginRight':'20px','width':'200px'}),
@@ -223,6 +244,7 @@ app.layout = html.Div([
     html.Div(id='conteudo-principal', style={'padding':'20px'})
 ])
 
+# ========== CALLBACKS ==========
 @app.callback(
     Output('filtro-mes','options'),
     Input('filtro-ano','value')
@@ -756,8 +778,10 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         *abas_extra
     ])
 
+# ========== EXECUÇÃO DO APP ==========
 if __name__ == '__main__':
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
     app.run(debug=True, host='0.0.0.0', port=8050)
 
-
+# ========== SERVER PARA O RENDER ==========
+server = app.server
