@@ -111,7 +111,7 @@ def formatar_data(data_str):
         return str(data_str)
 
 def carregar_dados_da_planilha():
-planilha_path = 'base_auditoria.xlsx'
+    planilha_path = 'base_auditoria.xlsx'
     if not os.path.exists(planilha_path):
         print("❌ Planilha não encontrada: data/base_auditoria.xlsx")
         return None, None, None, None
