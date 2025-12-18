@@ -113,16 +113,20 @@ def formatar_data(data_str):
 def carregar_dados_da_planilha():
     planilha_path = 'base_auditoria.xlsx'
     if not os.path.exists(planilha_path):
-        print("❌ Planilha não encontrada: data/base_auditoria.xlsx")
+        print("❌ Planilha não encontrada:", planilha_path)
         return None, None, None, None
 
     try:
         print(f"📁 Carregando dados da planilha: {planilha_path}")
 
-        df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades')
-        df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas')
-        df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco')
-        df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica')
+          # MODIFIQUE AS LINHAS ABAIXO:
+        # Adicione engine='openpyxl' e dtype=str para evitar erros de parsing
+        df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', engine='openpyxl', dtype=str)
+        df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', engine='openpyxl', dtype=str)
+        df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco', engine='openpyxl', dtype=str)
+        df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica', engine='openpyxl', dtype=str)
+
+        print("✅ Leitura inicial da planilha concluída. Processando dados...")
 
         for i, df in enumerate([df_checklist, df_politicas, df_risco, df_melhorias]):
             if df is not None:
@@ -755,4 +759,5 @@ def atualizar_conteudo_principal(ano, mes, unidade):
 if __name__ == '__main__':
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
     app.run(debug=True, host='0.0.0.0', port=8050)
+
 
