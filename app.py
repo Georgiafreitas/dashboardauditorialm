@@ -92,8 +92,8 @@ def calcular_status_prazo(prazo_str, finalizacao_str):
             return "Não Concluído"
         
         # Converter strings para datetime
-        prazo = pd.to_datetime(prazo_str, errors='coerce')
-        finalizacao = pd.to_datetime(finalizacao_str, errors='coerce')
+        prazo = pd.to_datetime(prazo_str, errors='coerce', dayfirst=True)
+        finalizacao = pd.to_datetime(finalizacao_str, errors='coerce', dayfirst=True)
         
         if pd.isna(prazo) or pd.isna(finalizacao):
             return "Não Concluído"
@@ -108,15 +108,24 @@ def calcular_status_prazo(prazo_str, finalizacao_str):
         return "Não Concluído"
 
 def formatar_data(data_str):
-    """Formata a data para DD/MM/YYYY"""
+    """Formata a data para DD/MM/YYYY (formato brasileiro)"""
     try:
         if pd.isna(data_str) or str(data_str).strip() in ['', 'NaT', 'None']:
             return ""
-        data = pd.to_datetime(data_str, errors='coerce')
+        
+        # Se já for um objeto datetime, formata diretamente
+        if isinstance(data_str, (pd.Timestamp, datetime)):
+            return data_str.strftime('%d/%m/%Y')
+        
+        # Se for string, tenta converter para datetime primeiro
+        # dayfirst=True ajuda no formato brasileiro (dd/mm/aaaa)
+        data = pd.to_datetime(data_str, errors='coerce', dayfirst=True)
         if pd.isna(data):
-            return ""
+            return str(data_str)  # Retorna original se não puder converter
+        
         return data.strftime('%d/%m/%Y')
-    except:
+    except Exception as e:
+        print(f"Erro ao formatar data '{data_str}': {e}")
         return str(data_str)
 
 def carregar_dados_da_planilha():
@@ -149,14 +158,22 @@ def carregar_dados_da_planilha():
                     print(f"DEBUG: Valores únicos de Status após normalização: {df['Status'].unique()}")
                 # Normalizar datas para checklist e melhorias, se houver
                 if 'Data' in df.columns:
-                    df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
+                    df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
                     df['Ano'] = df['Data'].dt.year
                     df['Mes'] = df['Data'].dt.month
                     df['Mes_Ano'] = df['Data'].dt.strftime('%m/%Y')
+                    
+                    # CORREÇÃO: Formata datas no padrão brasileiro dd/mm/aaaa
                     try:
-                        df['Data'] = df['Data'].dt.strftime('%d/%m/%Y')
-                    except:
-                        pass
+                        # Converte para formato brasileiro dd/mm/aaaa
+                        df['Data'] = df['Data'].apply(
+                            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
+                        )
+                    except Exception as e:
+                        print(f"⚠️ Aviso ao formatar Data: {e}")
+                        # Mantém a data como string se não conseguir converter
+                        df['Data'] = df['Data'].astype(str)
+                
                 if i == 0: df_checklist = df
                 elif i == 1: df_politicas = df
                 elif i == 2: df_risco = df
@@ -367,7 +384,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         
         # Se temos ambas as colunas, calcular status do prazo
         if tem_prazo and tem_finalizacao:
-            # Garantir que as colunas estejam formatadas
+            # Garantir que as colunas estejam formatadas (usando a função formatar_data)
             df_nao_conforme_display['Prazo_Formatado'] = df_nao_conforme_display[coluna_prazo].apply(formatar_data)
             df_nao_conforme_display['Finalizacao_Formatada'] = df_nao_conforme_display[coluna_finalizacao].apply(formatar_data)
             
@@ -480,6 +497,14 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'fontWeight': 'bold'
                 }
             ]
+        
+        # Aplicar formatação de data em todas as colunas que parecem ser datas
+        colunas_data = [col for col in df_nao_conforme_display.columns 
+                       if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
+        
+        for coluna_data in colunas_data:
+            if coluna_data in df_nao_conforme_display.columns:
+                df_nao_conforme_display[coluna_data] = df_nao_conforme_display[coluna_data].apply(formatar_data)
         
         tabela_nao_conforme = dash_table.DataTable(
             df_nao_conforme_display.to_dict('records'),
@@ -721,8 +746,17 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     # ---------- Melhorias e Políticas (SEM FILTROS) ----------
     # Mostrar sempre todos os dados sem aplicar filtros
     if df_melhorias is not None and len(df_melhorias) > 0:
+        # Aplicar formatação de data nas colunas de data
+        colunas_data_melhorias = [col for col in df_melhorias.columns 
+                                 if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
+        
+        df_melhorias_display = df_melhorias.copy()
+        for coluna_data in colunas_data_melhorias:
+            if coluna_data in df_melhorias_display.columns:
+                df_melhorias_display[coluna_data] = df_melhorias_display[coluna_data].apply(formatar_data)
+        
         tabela_melhorias = dash_table.DataTable(
-            df_melhorias.to_dict('records'),
+            df_melhorias_display.to_dict('records'),
             page_size=10,
             style_table={'overflowX':'auto','marginTop':'10px'},
             style_header={'backgroundColor': '#34495e','color': 'white','fontWeight': 'bold','textAlign':'center'},
@@ -744,8 +778,17 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         ], style={'marginTop':'30px'}))
 
     if df_politicas is not None and len(df_politicas) > 0:
+        # Aplicar formatação de data nas colunas de data
+        colunas_data_politicas = [col for col in df_politicas.columns 
+                                 if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
+        
+        df_politicas_display = df_politicas.copy()
+        for coluna_data in colunas_data_politicas:
+            if coluna_data in df_politicas_display.columns:
+                df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
+        
         tabela_politicas = dash_table.DataTable(
-            df_politicas.to_dict('records'),
+            df_politicas_display.to_dict('records'),
             page_size=10,
             style_table={'overflowX':'auto','marginTop':'10px'},
             style_header={'backgroundColor': '#34495e','color': 'white','fontWeight': 'bold','textAlign':'center'},
