@@ -524,45 +524,40 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         tabela_titulo = html.H3("❌ Itens Não Conformes (0 itens)")
 
     # ---------- Matriz de Risco (COM FILTROS) ----------
-abas_extra = []
+    abas_extra = []
 
-if df_risco is not None and len(df_risco) > 0:
-    df_risco_filtrado = df_risco.copy()
-    if ano != 'todos' and 'Ano' in df_risco_filtrado.columns:
-        df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == int(ano)]
-    if mes != 'todos' and 'Mes' in df_risco_filtrado.columns:
-        df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == int(mes)]
-    if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
-        df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
+    if df_risco is not None and len(df_risco) > 0:
+        df_risco_filtrado = df_risco.copy()
+        if ano != 'todos' and 'Ano' in df_risco_filtrado.columns:
+            df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == int(ano)]
+        if mes != 'todos' and 'Mes' in df_risco_filtrado.columns:
+            df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == int(mes)]
+        if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
+            df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
 
-    # CORREÇÃO: Criar Mes_Ano de forma robusta
-    if 'Mes' in df_risco_filtrado.columns and 'Ano' in df_risco_filtrado.columns:
-        # Converter para string e garantir 2 dígitos para o mês
-        df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
-            lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
-            if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
-            else "", 
-            axis=1
-        )
-    else:
-        df_risco_filtrado['Mes_Ano'] = ""
-
-    if len(df_risco_filtrado) > 0:
-        # Agrupar dados por Unidade e Mes_Ano
-        unidades = sorted(df_risco_filtrado['Unidade'].unique())
-        
-        # CORREÇÃO: Extrair meses_anos dos dados filtrados
-        meses_anos = sorted(df_risco_filtrado['Mes_Ano'].unique())
-        # Remover strings vazias
-        meses_anos = [ma for ma in meses_anos if ma and str(ma).strip()]
-        
-        print(f"DEBUG Matriz: {len(unidades)} unidades, {len(meses_anos)} meses_anos")
-        print(f"DEBUG Meses_Anos: {meses_anos}")
+        # CORREÇÃO: Criar Mes_Ano de forma robusta
+        if 'Mes' in df_risco_filtrado.columns and 'Ano' in df_risco_filtrado.columns:
+            # Converter para string e garantir 2 dígitos para o mês
+            df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
+                lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
+                if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
+                else "", 
+                axis=1
+            )
+        else:
+            df_risco_filtrado['Mes_Ano'] = ""
 
         if len(df_risco_filtrado) > 0:
             # Agrupar dados por Unidade e Mes_Ano
             unidades = sorted(df_risco_filtrado['Unidade'].unique())
+            
+            # CORREÇÃO: Extrair meses_anos dos dados filtrados
             meses_anos = sorted(df_risco_filtrado['Mes_Ano'].unique())
+            # Remover strings vazias
+            meses_anos = [ma for ma in meses_anos if ma and str(ma).strip()]
+            
+            print(f"DEBUG Matriz: {len(unidades)} unidades, {len(meses_anos)} meses_anos")
+            print(f"DEBUG Meses_Anos: {meses_anos}")
             
             # Criar estrutura de dados para a matriz
             matriz_data = []
@@ -846,4 +841,3 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
