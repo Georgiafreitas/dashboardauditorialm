@@ -157,36 +157,66 @@ def carregar_dados_da_planilha():
                     df['Status'] = df['Status'].apply(canonical_status)
                     print(f"DEBUG: Valores únicos de Status após normalização: {df['Status'].unique()}")
                 
-                # CORREÇÃO: Converter colunas Ano e Mes para inteiros
-                if 'Ano' in df.columns:
-                    df['Ano'] = pd.to_numeric(df['Ano'], errors='coerce').fillna(0).astype(int)
-                    df['Ano'] = df['Ano'].replace(0, pd.NA)  # Converter 0 de volta para NA
-                
-                if 'Mes' in df.columns:
-                    df['Mes'] = pd.to_numeric(df['Mes'], errors='coerce').fillna(0).astype(int)
-                    df['Mes'] = df['Mes'].replace(0, pd.NA)
-                
-                # Normalizar datas para checklist e melhorias, se houver
-                if 'Data' in df.columns:
-                    df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
-                    # Extrair Ano e Mes da coluna Data se não existirem
-                    if 'Ano' not in df.columns or df['Ano'].isna().all():
-                        df['Ano'] = df['Data'].dt.year
-                    if 'Mes' not in df.columns or df['Mes'].isna().all():
-                        df['Mes'] = df['Data'].dt.month
+                # CORREÇÃO ESPECÍFICA PARA df_risco (índice 2) - EXTRAIR MÊS E ANO DA COLUNA Data
+                if i == 2:  # df_risco
+                    print("🔄 Processando dados de RISCO...")
+                    print(f"  Colunas disponíveis no risco: {df.columns.tolist()}")
                     
-                    df['Mes_Ano'] = df['Data'].dt.strftime('%m/%Y')
-                    
-                    # CORREÇÃO: Formata datas no padrão brasileiro dd/mm/aaaa
-                    try:
-                        # Converte para formato brasileiro dd/mm/aaaa
-                        df['Data'] = df['Data'].apply(
+                    # Verificar se temos a coluna Data
+                    if 'Data' in df.columns:
+                        print(f"  ✅ Coluna 'Data' encontrada! Extraindo mês e ano...")
+                        
+                        # Converter a coluna Data para datetime (formato brasileiro dd/mm/aaaa)
+                        df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
+                        
+                        # Extrair mês e ano
+                        df['Mes'] = df['Data_DT'].dt.month
+                        df['Ano'] = df['Data_DT'].dt.year
+                        
+                        # Criar Mes_Ano para exibição (ex: "06/2025")
+                        df['Mes_Ano'] = df.apply(
+                            lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
+                            if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
+                            else "Sem Data",
+                            axis=1
+                        )
+                        
+                        print(f"  ✅ Mês/Ano extraídos. Exemplos: {df['Mes_Ano'].unique()[:5]}")
+                        
+                        # Formatar a Data original para exibição
+                        df['Data'] = df['Data_DT'].apply(
                             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
                         )
-                    except Exception as e:
-                        print(f"⚠️ Aviso ao formatar Data: {e}")
-                        # Mantém a data como string se não conseguir converter
-                        df['Data'] = df['Data'].astype(str)
+                        
+                        # Remover coluna temporária
+                        df = df.drop(columns=['Data_DT'])
+                    else:
+                        print("  ⚠️ Coluna 'Data' NÃO encontrada na aba Auditoria_Risco!")
+                        print(f"  Colunas disponíveis: {df.columns.tolist()}")
+                        # Tentar encontrar coluna similar
+                        colunas_similares = [col for col in df.columns if 'data' in col.lower() or 'date' in col.lower()]
+                        if colunas_similares:
+                            print(f"  Colunas similares encontradas: {colunas_similares}")
+                
+                # Para outras abas (checklist e melhorias)
+                else:
+                    # Normalizar datas para checklist e melhorias, se houver
+                    if 'Data' in df.columns:
+                        df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
+                        df['Ano'] = df['Data'].dt.year
+                        df['Mes'] = df['Data'].dt.month
+                        df['Mes_Ano'] = df['Data'].dt.strftime('%m/%Y')
+                        
+                        # CORREÇÃO: Formata datas no padrão brasileiro dd/mm/aaaa
+                        try:
+                            # Converte para formato brasileiro dd/mm/aaaa
+                            df['Data'] = df['Data'].apply(
+                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
+                            )
+                        except Exception as e:
+                            print(f"⚠️ Aviso ao formatar Data: {e}")
+                            # Mantém a data como string se não conseguir converter
+                            df['Data'] = df['Data'].astype(str)
                 
                 if i == 0: df_checklist = df
                 elif i == 1: df_politicas = df
@@ -194,6 +224,13 @@ def carregar_dados_da_planilha():
                 elif i == 3: df_melhorias = df
 
         print("✅ Dados carregados da planilha com sucesso!")
+        print(f"  Checklist: {len(df_checklist)} registros")
+        print(f"  Risco: {len(df_risco)} registros | Colunas: {df_risco.columns.tolist()}")
+        if 'Mes' in df_risco.columns and 'Ano' in df_risco.columns:
+            print(f"  Risco - Meses únicos: {df_risco['Mes'].unique()}")
+            print(f"  Risco - Anos únicos: {df_risco['Ano'].unique()}")
+            print(f"  Risco - Mes_Ano únicos: {df_risco['Mes_Ano'].unique()}")
+        
         return df_checklist, df_politicas, df_risco, df_melhorias
 
     except Exception as e:
@@ -926,4 +963,5 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
 
