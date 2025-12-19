@@ -253,7 +253,7 @@ def criar_sigla_relatorio(relatorio, index):
     return f"R{index:03d}"
 
 def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
-    """Cria matriz de risco com TODAS AS SIGLAS visíveis (fonte muito pequena se necessário)"""
+    """Cria matriz de risco com design limpo e todas as siglas visíveis"""
     
     if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
         return html.Div([
@@ -317,374 +317,347 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     # Ordenar siglas alfabeticamente
                     siglas_no_mes.sort(key=lambda x: x['sigla'])
                     
-                    # Determinar tamanho da fonte baseado na quantidade de siglas
-                    num_siglas = len(siglas_no_mes)
-                    
-                    if num_siglas <= 3:
-                        # Poucas siglas - fonte normal
-                        font_size = '9px'
-                        grid_columns = '1fr'
-                        item_height = '25px'
-                    elif num_siglas <= 6:
-                        # Quantidade média - fonte menor
-                        font_size = '8px'
-                        grid_columns = 'repeat(2, 1fr)'
-                        item_height = '22px'
-                    elif num_siglas <= 10:
-                        # Muitas siglas - fonte bem pequena
-                        font_size = '7px'
-                        grid_columns = 'repeat(2, 1fr)'
-                        item_height = '20px'
-                    else:
-                        # MUITAS siglas - fonte mínima
-                        font_size = '6px'
-                        grid_columns = 'repeat(3, 1fr)'
-                        item_height = '18px'
-                    
-                    # Criar container para as siglas com grid adaptativo
+                    # Criar container limpo para as siglas
                     siglas_html = []
                     for item in siglas_no_mes:
                         siglas_html.append(html.Div(
                             item['sigla'],
                             style={
-                                'fontSize': font_size,
-                                'fontWeight': 'bold',
+                                'fontSize': '10px',
+                                'fontWeight': '600',
                                 'color': item['cor']['text_color'],
                                 'textAlign': 'center',
                                 'backgroundColor': item['cor']['bg_color'],
-                                'padding': '1px 2px',
-                                'margin': '0.5px',
-                                'borderRadius': '2px',
+                                'padding': '4px 6px',
+                                'margin': '1px',
+                                'borderRadius': '4px',
                                 'border': f'1px solid {item["cor"]["border_color"]}',
-                                'minWidth': '30px',
-                                'maxWidth': '35px',
-                                'height': item_height,
+                                'minWidth': '35px',
+                                'height': '25px',
                                 'display': 'flex',
                                 'alignItems': 'center',
                                 'justifyContent': 'center',
                                 'cursor': 'default',
-                                'overflow': 'hidden',
-                                'textOverflow': 'ellipsis'
+                                'boxShadow': '0 1px 2px rgba(0,0,0,0.05)'
                             }
                         ))
                     
-                    # Criar grid responsivo
+                    # Criar container com design limpo
                     linha[mes] = html.Div(
                         siglas_html,
                         style={
-                            'display': 'grid',
-                            'gridTemplateColumns': grid_columns,
-                            'gap': '1px',
-                            'padding': '2px',
-                            'overflow': 'hidden',
-                            'maxHeight': '80px',
-                            'overflowY': 'auto'
+                            'display': 'flex',
+                            'flexWrap': 'wrap',
+                            'gap': '3px',
+                            'padding': '8px',
+                            'justifyContent': 'center',
+                            'alignItems': 'center',
+                            'minHeight': '60px',
+                            'borderRadius': '4px',
+                            'backgroundColor': '#f8fafc'
                         }
                     )
                 else:
-                    linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '8px', 'padding': '8px 0'})
+                    linha[mes] = html.Div("-", 
+                        style={
+                            'color': '#bdc3c7', 
+                            'fontSize': '12px', 
+                            'padding': '20px 0',
+                            'textAlign': 'center',
+                            'fontStyle': 'italic'
+                        })
             else:
-                linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '8px', 'padding': '8px 0'})
+                linha[mes] = html.Div("-", 
+                    style={
+                        'color': '#bdc3c7', 
+                        'fontSize': '12px', 
+                        'padding': '20px 0',
+                        'textAlign': 'center',
+                        'fontStyle': 'italic'
+                    })
         
         matriz_data.append(linha)
     
     # Ordenar siglas encontradas alfabeticamente
     siglas_ordenadas = sorted(siglas_encontradas)
     
-    # Criar tabela HTML com siglas visíveis
+    # Criar tabela HTML com design limpo
     tabela_cabecalho = [html.Th("UNIDADE", style={
-        'backgroundColor': '#2c3e50',
+        'backgroundColor': '#34495e',
         'color': 'white',
-        'padding': '6px 8px',
+        'padding': '12px 15px',
         'textAlign': 'center',
-        'fontWeight': 'bold',
+        'fontWeight': '600',
         'border': '1px solid #2c3e50',
-        'minWidth': '100px',
-        'maxWidth': '120px',
-        'fontSize': '11px',
+        'minWidth': '150px',
+        'fontSize': '13px',
         'position': 'sticky',
         'left': '0',
-        'zIndex': '2'
+        'zIndex': '2',
+        'boxShadow': '2px 0 2px rgba(0,0,0,0.1)'
     })]
     
     for mes in meses_ano:
         tabela_cabecalho.append(html.Th(
             html.Div([
-                html.Div(nomes_meses[mes], style={'fontSize': '10px', 'fontWeight': 'bold'}),
-                html.Div(str(mes), style={'fontSize': '8px', 'opacity': '0.8'})
-            ]),
+                html.Div(nomes_meses[mes], style={'fontSize': '12px', 'fontWeight': '600', 'marginBottom': '2px'}),
+                html.Div(str(mes), style={'fontSize': '10px', 'opacity': '0.8', 'fontWeight': '400'})
+            ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center'}),
             style={
-                'backgroundColor': '#2c3e50',
+                'backgroundColor': '#34495e',
                 'color': 'white',
-                'padding': '4px 2px',
+                'padding': '10px 5px',
                 'textAlign': 'center',
-                'fontWeight': 'bold',
+                'fontWeight': '600',
                 'border': '1px solid #2c3e50',
-                'minWidth': '50px',
-                'maxWidth': '60px',
-                'fontSize': '10px'
+                'minWidth': '70px',
+                'fontSize': '12px'
             }
         ))
     
     tabela_linhas = []
     
     for i, linha in enumerate(matriz_data):
-        bg_color = '#f8f9fa' if i % 2 == 0 else 'white'
+        bg_color = '#ffffff' if i % 2 == 0 else '#f8fafc'
         
         celulas = [html.Td(
-            html.Div(linha['Unidade'], style={
-                'fontSize': '10px',
-                'fontWeight': 'bold',
-                'overflow': 'hidden',
-                'textOverflow': 'ellipsis',
-                'whiteSpace': 'nowrap',
-                'padding': '1px 0'
-            }),
+            html.Div([
+                html.Div(linha['Unidade'], style={
+                    'fontSize': '12px',
+                    'fontWeight': '600',
+                    'overflow': 'hidden',
+                    'textOverflow': 'ellipsis',
+                    'whiteSpace': 'nowrap',
+                    'color': '#2c3e50'
+                })
+            ]),
             style={
                 'backgroundColor': bg_color,
-                'padding': '6px 8px',
+                'padding': '12px 15px',
                 'textAlign': 'left',
-                'border': '1px solid #dee2e6',
-                'fontSize': '10px',
-                'minWidth': '100px',
-                'maxWidth': '120px',
+                'border': '1px solid #e0e6ed',
+                'fontSize': '12px',
+                'minWidth': '150px',
                 'position': 'sticky',
                 'left': '0',
-                'zIndex': '1'
+                'zIndex': '1',
+                'boxShadow': '2px 0 2px rgba(0,0,0,0.05)'
             }
         )]
         
         for mes in meses_ano:
-            conteudo = linha.get(mes, html.Div("-", style={'color': '#ccc', 'fontSize': '8px', 'padding': '8px 0'}))
+            conteudo = linha.get(mes, html.Div("-", style={'color': '#bdc3c7', 'fontSize': '12px', 'padding': '20px 0', 'textAlign': 'center'}))
             celulas.append(html.Td(
                 conteudo,
                 style={
                     'backgroundColor': bg_color,
-                    'padding': '2px 1px',
+                    'padding': '5px',
                     'textAlign': 'center',
-                    'border': '1px solid #dee2e6',
+                    'border': '1px solid #e0e6ed',
                     'verticalAlign': 'middle',
-                    'minHeight': '50px',
-                    'minWidth': '50px',
-                    'maxWidth': '60px',
-                    'overflow': 'hidden'
+                    'minHeight': '70px',
+                    'minWidth': '70px'
                 }
             ))
         
-        tabela_linhas.append(html.Tr(celulas, style={'borderBottom': '1px solid #dee2e6'}))
+        tabela_linhas.append(html.Tr(celulas))
     
     tabela_html = html.Table([
         html.Thead(html.Tr(tabela_cabecalho)),
         html.Tbody(tabela_linhas)
     ], style={
         'width': '100%',
-        'borderCollapse': 'collapse',
-        'marginTop': '5px',
-        'fontFamily': 'Arial, sans-serif',
-        'fontSize': '10px',
-        'tableLayout': 'fixed'
+        'borderCollapse': 'separate',
+        'borderSpacing': '0',
+        'marginTop': '10px',
+        'fontFamily': "'Segoe UI', 'Helvetica Neue', Arial, sans-serif",
+        'fontSize': '12px',
+        'tableLayout': 'fixed',
+        'borderRadius': '8px',
+        'overflow': 'hidden',
+        'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
     })
     
-    # Container compacto
+    # Container da tabela
     tabela_container = html.Div(
         tabela_html,
         style={
             'overflowX': 'auto',
             'maxWidth': '100%',
-            'marginTop': '10px',
-            'border': '1px solid #dee2e6',
-            'borderRadius': '3px',
-            'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+            'marginTop': '20px',
+            'borderRadius': '8px',
             'maxHeight': '600px',
-            'overflowY': 'auto'
+            'overflowY': 'auto',
+            'border': '1px solid #e0e6ed'
         }
     )
     
-    # Criar lista de siglas e seus significados
+    # Criar lista de siglas e seus significados com design limpo
     lista_siglas = []
     
     for sigla in siglas_ordenadas:
         significado = obter_significado_sigla(sigla)
         lista_siglas.append(html.Div([
-            html.Span(f"{sigla}: ", style={
-                'fontWeight': 'bold',
-                'color': '#2c3e50',
-                'fontSize': '11px',
-                'minWidth': '35px',
-                'display': 'inline-block'
+            html.Span(f"{sigla}", style={
+                'fontWeight': '600',
+                'color': '#34495e',
+                'fontSize': '12px',
+                'minWidth': '40px',
+                'display': 'inline-block',
+                'backgroundColor': '#ecf0f1',
+                'padding': '4px 8px',
+                'borderRadius': '4px',
+                'marginRight': '10px',
+                'textAlign': 'center',
+                'border': '1px solid #bdc3c7'
             }),
             html.Span(significado, style={
-                'color': '#7f8c8d',
-                'fontSize': '11px'
+                'color': '#2c3e50',
+                'fontSize': '12px'
             })
         ], style={
-            'marginBottom': '4px',
-            'padding': '3px 8px',
-            'borderBottom': '1px solid #f0f0f0',
-            'backgroundColor': '#f8f9fa',
-            'borderRadius': '2px'
+            'marginBottom': '8px',
+            'padding': '6px 10px',
+            'borderBottom': '1px solid #ecf0f1',
+            'backgroundColor': '#ffffff',
+            'borderRadius': '4px',
+            'display': 'flex',
+            'alignItems': 'center'
         }))
     
     # Se não encontrou siglas conhecidas, mostrar mensagem
     if not siglas_encontradas:
         lista_siglas = [html.P("Nenhuma sigla conhecida encontrada nos dados.", 
-                               style={'color': '#7f8c8d', 'fontSize': '11px', 'textAlign': 'center', 'padding': '10px'})]
+                               style={'color': '#7f8c8d', 'fontSize': '12px', 'textAlign': 'center', 'padding': '15px'})]
     
-    # Organizar siglas em colunas para melhor visualização
-    num_siglas = len(siglas_ordenadas)
-    if num_siglas > 0:
-        # Dividir siglas em 2 colunas se houver muitas
-        if num_siglas > 15:
-            metade = (num_siglas + 1) // 2
-            coluna1 = lista_siglas[:metade]
-            coluna2 = lista_siglas[metade:]
-            
-            lista_siglas_container = html.Div([
-                html.H4("📚 LEGENDA DE SIGLAS", style={
-                    'marginBottom': '10px',
-                    'color': '#2c3e50',
-                    'fontSize': '13px',
-                    'textAlign': 'center',
-                    'backgroundColor': '#ecf0f1',
-                    'padding': '8px',
-                    'borderRadius': '3px',
-                    'border': '1px solid #bdc3c7'
-                }),
-                html.P(f"Total de {len(siglas_encontradas)} siglas distintas encontradas", 
-                       style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px', 'textAlign': 'center'}),
-                html.Div([
-                    html.Div(coluna1, style={'flex': '1', 'padding': '5px'}),
-                    html.Div(coluna2, style={'flex': '1', 'padding': '5px'})
-                ], style={'display': 'flex', 'maxHeight': '200px', 'overflowY': 'auto', 'gap': '15px'})
-            ], style={
-                'marginTop': '20px',
-                'padding': '12px',
-                'backgroundColor': 'white',
-                'borderRadius': '5px',
-                'border': '1px solid #dee2e6',
-                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)'
-            })
-        else:
-            # Uma coluna só
-            lista_siglas_container = html.Div([
-                html.H4("📚 LEGENDA DE SIGLAS", style={
-                    'marginBottom': '10px',
-                    'color': '#2c3e50',
-                    'fontSize': '13px',
-                    'textAlign': 'center',
-                    'backgroundColor': '#ecf0f1',
-                    'padding': '8px',
-                    'borderRadius': '3px',
-                    'border': '1px solid #bdc3c7'
-                }),
-                html.P(f"Total de {len(siglas_encontradas)} siglas distintas encontradas", 
-                       style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px', 'textAlign': 'center'}),
-                html.Div(lista_siglas, style={'maxHeight': '200px', 'overflowY': 'auto', 'padding': '5px'})
-            ], style={
-                'marginTop': '20px',
-                'padding': '12px',
-                'backgroundColor': 'white',
-                'borderRadius': '5px',
-                'border': '1px solid #dee2e6',
-                'boxShadow': '0 1px 3px rgba(0,0,0,0.1)'
-            })
-    else:
-        lista_siglas_container = html.Div()
-    
-    # Legenda de cores
-    legenda_cores = html.Div([
-        html.P("🎨 LEGENDA DE STATUS:", style={
-            'marginBottom': '6px',
-            'color': '#2c3e50',
-            'fontSize': '10px',
-            'fontWeight': 'bold'
+    # Container da lista de siglas com design limpo
+    lista_siglas_container = html.Div([
+        html.Div([
+            html.H4("📋 LEGENDA DE SIGLAS", style={
+                'margin': '0 0 15px 0',
+                'color': '#2c3e50',
+                'fontSize': '14px',
+                'fontWeight': '600'
+            }),
+            html.P(f"Total de {len(siglas_encontradas)} siglas distintas encontradas", 
+                   style={'color': '#7f8c8d', 'marginBottom': '15px', 'fontSize': '11px'})
+        ], style={
+            'backgroundColor': '#ecf0f1',
+            'padding': '15px',
+            'borderRadius': '6px 6px 0 0',
+            'borderBottom': '2px solid #bdc3c7'
         }),
+        html.Div(lista_siglas, style={
+            'maxHeight': '200px', 
+            'overflowY': 'auto', 
+            'padding': '15px',
+            'backgroundColor': '#ffffff'
+        })
+    ], style={
+        'marginTop': '25px',
+        'borderRadius': '8px',
+        'border': '1px solid #e0e6ed',
+        'boxShadow': '0 2px 8px rgba(0,0,0,0.1)',
+        'overflow': 'hidden'
+    })
+    
+    # Legenda de cores com design limpo
+    legenda_cores = html.Div([
+        html.Div([
+            html.H5("🎨 LEGENDA DE STATUS", style={
+                'margin': '0 0 10px 0',
+                'color': '#2c3e50',
+                'fontSize': '12px',
+                'fontWeight': '600'
+            })
+        ], style={'marginBottom': '10px'}),
         html.Div([
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '14px',
+                    'height': '14px',
                     'backgroundColor': '#c0392b',
-                    'borderRadius': '2px',
-                    'marginRight': '4px',
+                    'borderRadius': '3px',
+                    'marginRight': '8px',
                     'border': '1px solid #c0392b'
                 }),
-                html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '9px'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '12px'}),
+                html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '20px'}),
             
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '14px',
+                    'height': '14px',
                     'backgroundColor': '#f39c12',
-                    'borderRadius': '2px',
-                    'marginRight': '4px',
+                    'borderRadius': '3px',
+                    'marginRight': '8px',
                     'border': '1px solid #f39c12'
                 }),
-                html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '9px'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '12px'}),
+                html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '20px'}),
             
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '14px',
+                    'height': '14px',
                     'backgroundColor': '#27ae60',
-                    'borderRadius': '2px',
-                    'marginRight': '4px',
+                    'borderRadius': '3px',
+                    'marginRight': '8px',
                     'border': '1px solid #27ae60'
                 }),
-                html.Span("Finalizado/Conforme", style={'color': '#2c3e50', 'fontSize': '9px'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '12px'}),
+                html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '20px'}),
             
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '14px',
+                    'height': '14px',
                     'backgroundColor': '#fff8e1',
-                    'borderRadius': '2px',
-                    'marginRight': '4px',
+                    'borderRadius': '3px',
+                    'marginRight': '8px',
                     'border': '1px solid #f39c12'
                 }),
-                html.Span("Conforme Parcialmente", style={'color': '#2c3e50', 'fontSize': '9px'})
+                html.Span("Conforme Parcial", style={'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': '500'})
             ], style={'display': 'flex', 'alignItems': 'center'})
-        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '8px', 'alignItems': 'center'})
+        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px', 'alignItems': 'center'})
     ], style={
-        'backgroundColor': '#f8f9fa',
-        'padding': '8px 10px',
-        'borderRadius': '3px',
-        'marginBottom': '12px',
-        'border': '1px solid #dee2e6',
-        'fontSize': '10px'
+        'backgroundColor': '#f8fafc',
+        'padding': '15px',
+        'borderRadius': '6px',
+        'marginBottom': '20px',
+        'border': '1px solid #e0e6ed'
     })
     
-    titulo_matriz = f"📋 MATRIZ DE RISCO - {ano_filtro} ({len(df_risco_filtrado)} registros, {len(siglas_encontradas)} siglas)"
+    titulo_matriz = html.Div([
+        html.H4(f"📋 MATRIZ DE RISCO - {ano_filtro}", style={
+            'margin': '0 0 5px 0',
+            'color': '#2c3e50',
+            'fontSize': '16px',
+            'fontWeight': '600'
+        }),
+        html.P(f"{len(df_risco_filtrado)} registros • {len(siglas_encontradas)} siglas distintas", 
+               style={'color': '#7f8c8d', 'margin': '0', 'fontSize': '12px'})
+    ], style={
+        'marginBottom': '20px',
+        'padding': '15px',
+        'backgroundColor': '#ecf0f1',
+        'borderRadius': '6px',
+        'border': '1px solid #bdc3c7'
+    })
     
     return html.Div([
-        html.H4(titulo_matriz, style={
-            'marginBottom': '12px',
-            'color': '#2c3e50',
-            'fontSize': '15px',
-            'display': 'flex',
-            'alignItems': 'center',
-            'gap': '6px',
-            'backgroundColor': '#ecf0f1',
-            'padding': '8px',
-            'borderRadius': '3px'
-        }),
+        titulo_matriz,
         legenda_cores,
-        html.P("📊 MATRIZ: Cada célula mostra TODAS as SIGLAS (fonte reduzida para caber todas)", 
-               style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px'}),
-        html.P("ℹ️ Fonte automática: 1-3 siglas=9px, 4-6=8px, 7-10=7px, 10+=6px", 
-               style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '9px', 'fontStyle': 'italic'}),
+        html.P("Cada célula mostra todas as siglas dos relatórios daquela unidade/mês", 
+               style={'color': '#7f8c8d', 'marginBottom': '15px', 'fontSize': '12px', 'textAlign': 'center'}),
         tabela_container,
         lista_siglas_container
     ], style={
         'marginTop': '20px',
-        'padding': '12px',
+        'padding': '20px',
         'backgroundColor': 'white',
-        'borderRadius': '5px',
-        'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
-        'overflow': 'hidden'
+        'borderRadius': '8px',
+        'boxShadow': '0 4px 12px rgba(0,0,0,0.08)'
     })
 
 def carregar_dados_da_planilha():
@@ -1566,3 +1539,4 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
