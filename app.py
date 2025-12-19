@@ -198,7 +198,7 @@ def criar_sigla_relatorio(relatorio, index):
     return f"REL{index:03d}"
 
 def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
-    """Cria matriz de risco com todas as siglas visíveis e lista completa embaixo"""
+    """Cria matriz de risco com todas as siglas visíveis e lista completa embaixo (relatórios únicos)"""
     
     # Verificar se temos dados
     if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
@@ -227,9 +227,12 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
     print(f"  Unidades: {unidades}")
     print(f"  Total de registros: {len(df_risco_filtrado)}")
     
-    # Criar dicionário para mapear siglas para relatórios completos
-    mapeamento_siglas = {}
-    siglas_por_unidade_mes = {}  # Para armazenar todas as siglas por unidade/mês
+    # Dicionário para armazenar relatórios únicos
+    # Chave: (sigla, relatorio) -> informação do relatório
+    relatorios_unicos = {}
+    
+    # Para mapeamento rápido de sigla para relatório completo
+    sigla_para_relatorio = {}
     
     # Criar estrutura de dados para a matriz
     matriz_data = []
@@ -239,14 +242,13 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
         
         for mes in meses_ano:
-            # Filtrar por mês (converter para o tipo correto)
+            # Filtrar por mês
             df_unidade['Mes'] = pd.to_numeric(df_unidade['Mes'], errors='coerce')
             df_mes = df_unidade[df_unidade['Mes'] == mes]
             
             if len(df_mes) > 0:
                 # Para cada relatório no mês
                 relatorios_info = []
-                siglas_no_mes = []
                 
                 for _, row in df_mes.iterrows():
                     relatorio = str(row.get('Relatorio', ''))
@@ -254,18 +256,26 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     status = str(row.get('Status', 'Sem Status'))
                     cores = get_status_color(status)
                     
-                    # Armazenar mapeamento sigla -> relatório completo
-                    mapeamento_siglas[sigla] = {
-                        'relatorio': relatorio,
-                        'status': status,
-                        'unidade': unidade_nome,
-                        'mes': mes
-                    }
+                    # Armazenar mapeamento sigla -> relatório (apenas uma vez)
+                    if sigla not in sigla_para_relatorio:
+                        sigla_para_relatorio[sigla] = relatorio
                     
-                    # Armazenar sigla para este mês
-                    siglas_no_mes.append(sigla)
+                    # Armazenar/atualizar relatório único
+                    chave_relatorio = (sigla, relatorio)
+                    if chave_relatorio not in relatorios_unicos:
+                        relatorios_unicos[chave_relatorio] = {
+                            'sigla': sigla,
+                            'relatorio': relatorio,
+                            'status': status,
+                            'unidades': set([unidade_nome]),
+                            'meses': set([mes])
+                        }
+                    else:
+                        # Se já existe, adicionar unidade e mês
+                        relatorios_unicos[chave_relatorio]['unidades'].add(unidade_nome)
+                        relatorios_unicos[chave_relatorio]['meses'].add(mes)
                     
-                    # Criar elemento com a SIGLA visível e status
+                    # Criar elemento com a SIGLA visível
                     relatorio_item = html.Div([
                         html.Div(
                             sigla,
@@ -291,11 +301,8 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     ], style={'display': 'inline-block'})
                     relatorios_info.append(relatorio_item)
                 
-                # Armazenar siglas para esta unidade/mês
-                siglas_por_unidade_mes[f"{unidade_nome}_{mes}"] = siglas_no_mes
-                
                 if len(relatorios_info) > 0:
-                    # Criar container para todas as siglas do mês (verticalmente)
+                    # Criar container para todas as siglas do mês
                     if len(relatorios_info) > 4:
                         # Se tiver muitas siglas, mostrar as primeiras 4 e indicador
                         linha[mes] = html.Div([
@@ -343,7 +350,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         matriz_data.append(linha)
     
     # Criar lista de siglas únicas
-    siglas_unicas = sorted(set(mapeamento_siglas.keys()))
+    siglas_unicas = sorted(sigla_para_relatorio.keys())
     
     # Criar tabela HTML com siglas visíveis
     tabela_cabecalho = [html.Th("UNIDADE", style={
@@ -453,11 +460,13 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         }
     )
     
-    # Criar lista completa de siglas e relatórios (MUITO IMPORTANTE)
-    lista_siglas_completa = []
+    # Preparar lista de relatórios únicos
+    lista_relatorios = []
+    for info in relatorios_unicos.values():
+        lista_relatorios.append(info)
     
-    # Agrupar por status primeiro para melhor organização
-    siglas_por_status = {
+    # Agrupar por status
+    relatorios_por_status = {
         'Não Iniciado': [],
         'Pendente': [],
         'Finalizado': [],
@@ -467,58 +476,60 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'Outros': []
     }
     
-    for sigla, info in mapeamento_siglas.items():
-        status = info['status']
-        relatorio = info['relatorio']
-        unidade = info['unidade']
-        mes = info['mes']
-        mes_nome = nomes_completos.get(mes, f"Mês {mes}")
+    for relatorio_info in lista_relatorios:
+        status = relatorio_info['status']
         
-        item = {
-            'sigla': sigla,
-            'relatorio': relatorio,
-            'unidade': unidade,
-            'mes': mes_nome,
-            'status': status
+        # Formatar unidades e meses
+        unidades_str = ', '.join(sorted(relatorio_info['unidades']))
+        meses_list = sorted(relatorio_info['meses'])
+        meses_str = ', '.join([nomes_completos.get(m, f"Mês {m}") for m in meses_list])
+        
+        relatorio_formatado = {
+            'sigla': relatorio_info['sigla'],
+            'relatorio': relatorio_info['relatorio'],
+            'unidades': unidades_str,
+            'meses': meses_str
         }
         
         # Classificar por status
         status_lower = status.lower()
         if 'não iniciado' in status_lower or 'nao iniciado' in status_lower:
-            siglas_por_status['Não Iniciado'].append(item)
+            relatorios_por_status['Não Iniciado'].append(relatorio_formatado)
         elif 'pendente' in status_lower:
-            siglas_por_status['Pendente'].append(item)
+            relatorios_por_status['Pendente'].append(relatorio_formatado)
         elif 'finalizado' in status_lower:
-            siglas_por_status['Finalizado'].append(item)
+            relatorios_por_status['Finalizado'].append(relatorio_formatado)
         elif 'conforme' in status_lower:
             if 'parcial' in status_lower:
-                siglas_por_status['Conforme Parcialmente'].append(item)
+                relatorios_por_status['Conforme Parcialmente'].append(relatorio_formatado)
             else:
-                siglas_por_status['Conforme'].append(item)
+                relatorios_por_status['Conforme'].append(relatorio_formatado)
         elif 'não conforme' in status_lower or 'nao conforme' in status_lower:
-            siglas_por_status['Não Conforme'].append(item)
+            relatorios_por_status['Não Conforme'].append(relatorio_formatado)
         else:
-            siglas_por_status['Outros'].append(item)
+            relatorios_por_status['Outros'].append(relatorio_formatado)
     
     # Criar containers por status
     containers_status = []
     
-    for status_nome, itens in siglas_por_status.items():
-        if itens:
-            itens_ordenados = sorted(itens, key=lambda x: x['sigla'])
+    for status_nome, relatorios in relatorios_por_status.items():
+        if relatorios:
+            # Ordenar por sigla
+            relatorios_ordenados = sorted(relatorios, key=lambda x: x['sigla'])
             
             # Dividir em colunas para melhor visualização
             colunas = []
-            itens_por_coluna = 10
-            for i in range(0, len(itens_ordenados), itens_por_coluna):
-                coluna_itens = itens_ordenados[i:i + itens_por_coluna]
+            relatorios_por_coluna = 10  # Aproximadamente 10 itens por coluna
+            
+            for i in range(0, len(relatorios_ordenados), relatorios_por_coluna):
+                coluna_relatorios = relatorios_ordenados[i:i + relatorios_por_coluna]
                 
                 lista_coluna = []
-                for item in coluna_itens:
-                    cores = get_status_color(item['status'])
+                for relatorio in coluna_relatorios:
+                    cores = get_status_color(status_nome)
                     
                     lista_coluna.append(html.Div([
-                        html.Span(f"{item['sigla']}: ", style={
+                        html.Span(f"{relatorio['sigla']}: ", style={
                             'fontWeight': 'bold',
                             'color': cores['text_color'],
                             'fontSize': '10px',
@@ -530,7 +541,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                             'border': f'1px solid {cores["border_color"]}',
                             'marginRight': '5px'
                         }),
-                        html.Span(f"{item['relatorio'][:35]}", style={
+                        html.Span(f"{relatorio['relatorio'][:35]}", style={
                             'color': '#2c3e50',
                             'fontSize': '10px',
                             'overflow': 'hidden',
@@ -539,22 +550,29 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                             'maxWidth': '200px',
                             'display': 'inline-block'
                         }),
-                        html.Span(f" ({item['unidade']}, {item['mes']})", style={
-                            'color': '#7f8c8d',
-                            'fontSize': '9px',
-                            'fontStyle': 'italic'
-                        })
+                        html.Div([
+                            html.Span(f"Unidades: {relatorio['unidades']}", style={
+                                'color': '#7f8c8d',
+                                'fontSize': '9px',
+                                'fontStyle': 'italic'
+                            }),
+                            html.Span(f" | Meses: {relatorio['meses']}", style={
+                                'color': '#7f8c8d',
+                                'fontSize': '9px',
+                                'fontStyle': 'italic'
+                            })
+                        ], style={'marginTop': '2px'})
                     ], style={
-                        'marginBottom': '3px',
-                        'padding': '3px 5px',
+                        'marginBottom': '8px',
+                        'padding': '5px',
                         'borderBottom': '1px solid #f0f0f0',
-                        'display': 'flex',
-                        'alignItems': 'center'
+                        'backgroundColor': '#f8f9fa',
+                        'borderRadius': '3px'
                     }))
                 
                 colunas.append(html.Div(lista_coluna, style={
                     'flex': '1',
-                    'minWidth': '250px',
+                    'minWidth': '280px',
                     'marginRight': '15px'
                 }))
             
@@ -572,26 +590,26 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             cor_status = status_color_map.get(status_nome, '#7f8c8d')
             
             containers_status.append(html.Div([
-                html.H5(f"📋 {status_nome.upper()} ({len(itens)} relatórios)", style={
+                html.H5(f"📋 {status_nome.upper()} ({len(relatorios)} relatórios)", style={
                     'color': cor_status,
-                    'marginBottom': '8px',
+                    'marginBottom': '10px',
                     'fontSize': '12px',
                     'borderBottom': f'2px solid {cor_status}',
                     'paddingBottom': '3px',
                     'fontWeight': 'bold'
                 }),
-                html.Div(colunas, style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '10px'})
+                html.Div(colunas, style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px'})
             ], style={
                 'backgroundColor': '#f8f9fa',
                 'padding': '12px 15px',
                 'borderRadius': '4px',
                 'marginBottom': '15px',
-                'border': f'1px solid {cor_status}20'  # Cor com transparência
+                'border': f'1px solid {cor_status}20'
             }))
     
     # Container da lista completa
     lista_completa_container = html.Div([
-        html.H4("📋 LISTA COMPLETA DE RELATÓRIOS POR SIGLA", style={
+        html.H4("📋 LISTA COMPLETA DE RELATÓRIOS (ÚNICOS)", style={
             'marginBottom': '15px',
             'color': '#2c3e50',
             'fontSize': '14px',
@@ -601,7 +619,9 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'borderRadius': '4px',
             'border': '1px solid #bdc3c7'
         }),
-        html.Div(containers_status, style={'maxHeight': '300px', 'overflowY': 'auto', 'padding': '5px'})
+        html.P(f"Total de {len(lista_relatorios)} relatórios únicos encontrados", 
+               style={'color': '#7f8c8d', 'marginBottom': '10px', 'fontSize': '11px', 'textAlign': 'center'}),
+        html.Div(containers_status, style={'maxHeight': '350px', 'overflowY': 'auto', 'padding': '5px'})
     ], style={
         'marginTop': '20px',
         'padding': '15px',
@@ -677,7 +697,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'fontSize': '11px'
     })
     
-    titulo_matriz = f"📋 MATRIZ DE RISCO - {ano_filtro} ({len(df_risco_filtrado)} registros, {len(siglas_unicas)} siglas)"
+    titulo_matriz = f"📋 MATRIZ DE RISCO - {ano_filtro} ({len(df_risco_filtrado)} registros, {len(lista_relatorios)} relatórios únicos)"
     
     return html.Div([
         html.H4(titulo_matriz, style={
@@ -692,7 +712,9 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'borderRadius': '4px'
         }),
         legenda_cores,
-        html.P("📊 Cada célula mostra TODAS as siglas dos relatórios daquela unidade/mês", 
+        html.P("📊 Matriz: Cada célula mostra as siglas dos relatórios daquela unidade/mês", 
+               style={'color': '#7f8c8d', 'marginBottom': '10px', 'fontSize': '11px'}),
+        html.P("📋 Lista: Cada relatório aparece apenas UMA VEZ com todas as unidades/meses onde aparece", 
                style={'color': '#7f8c8d', 'marginBottom': '10px', 'fontSize': '11px'}),
         tabela_container,
         lista_completa_container
@@ -714,7 +736,7 @@ def carregar_dados_da_planilha():
     try:
         print(f"📁 Carregando dados da planilha: {planilha_path}")
 
-        # Leitura das planilhas - IMPORTANTE: Não usar dtype=str para permitir conversão de tipos
+        # Leitura das planilhas
         print("  Lendo aba Checklist_Unidades...")
         df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', engine='openpyxl')
         
@@ -786,7 +808,7 @@ def carregar_dados_da_planilha():
                     if 'Status' in df.columns:
                         df['Status'] = df['Status'].apply(canonical_status)
                 
-                elif i == 2:  # df_risco - CORREÇÃO COMPLETA AQUI
+                elif i == 2:  # df_risco
                     print("🔄 Processando dados de RISCO...")
                     print(f"  🔍 Colunas disponíveis: {df.columns.tolist()}")
                     
@@ -806,7 +828,7 @@ def carregar_dados_da_planilha():
                         print(f"  ⚠️ Coluna de Status não encontrada")
                         df['Status'] = "Não Iniciado"
                     
-                    # 2. Encontrar e processar coluna de Data - CORREÇÃO CRÍTICA
+                    # 2. Encontrar e processar coluna de Data
                     coluna_data = None
                     for col in df.columns:
                         if col.lower() == 'data':
@@ -821,7 +843,7 @@ def carregar_dados_da_planilha():
                         for j, data in enumerate(datas_amostra):
                             print(f"    {j+1:2d}. '{data}' (tipo: {type(data)})")
                         
-                        # CORREÇÃO: Converter datas para datetime de forma mais agressiva
+                        # Converter datas para datetime
                         print(f"\n  🔍 Convertendo datas para datetime...")
                         
                         # Primeiro, converter tudo para string para análise
@@ -832,18 +854,13 @@ def carregar_dados_da_planilha():
                             if pd.isna(data_str) or data_str in ['nan', 'NaT', 'None', '']:
                                 return pd.NaT
                             
-                            # Remover espaços extras
                             data_str = str(data_str).strip()
                             
                             # Padrões comuns
                             padroes = [
-                                # dd/mm/aaaa
                                 r'(\d{1,2})/(\d{1,2})/(\d{4})',
-                                # dd-mm-aaaa
                                 r'(\d{1,2})-(\d{1,2})-(\d{4})',
-                                # dd.mm.aaaa
                                 r'(\d{1,2})\.(\d{1,2})\.(\d{4})',
-                                # aaaa-mm-dd (formato ISO)
                                 r'(\d{4})-(\d{1,2})-(\d{1,2})',
                             ]
                             
@@ -853,16 +870,14 @@ def carregar_dados_da_planilha():
                                     grupos = match.groups()
                                     if len(grupos) == 3:
                                         try:
-                                            # Formato dd/mm/aaaa ou dd-mm-aaaa
                                             if '/' in data_str or '-' in data_str:
-                                                if int(grupos[0]) <= 31:  # Provavelmente dd/mm/aaaa
+                                                if int(grupos[0]) <= 31:
                                                     dia, mes, ano = grupos
-                                                    # Garantir que temos números
                                                     dia = int(dia)
                                                     mes = int(mes)
                                                     ano = int(ano)
                                                     return pd.Timestamp(year=ano, month=mes, day=dia)
-                                                else:  # Provavelmente aaaa-mm-dd
+                                                else:
                                                     ano, mes, dia = grupos
                                                     dia = int(dia)
                                                     mes = int(mes)
@@ -873,17 +888,14 @@ def carregar_dados_da_planilha():
                             
                             # Se não encontrou padrão, tentar pandas diretamente
                             try:
-                                # Primeiro formato brasileiro
                                 data_dt = pd.to_datetime(data_str, dayfirst=True, errors='coerce')
                                 if pd.notna(data_dt):
                                     return data_dt
                                 
-                                # Tentar formato americano
                                 data_dt = pd.to_datetime(data_str, dayfirst=False, errors='coerce')
                                 if pd.notna(data_dt):
                                     return data_dt
                                 
-                                # Tentar qualquer formato
                                 data_dt = pd.to_datetime(data_str, errors='coerce')
                                 return data_dt
                             except:
@@ -918,7 +930,7 @@ def carregar_dados_da_planilha():
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         
-                        # Criar Mes_Ano para exibição (usado apenas no checklist)
+                        # Criar Mes_Ano para exibição
                         df['Mes_Ano'] = df.apply(
                             lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
                             if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
@@ -1041,14 +1053,12 @@ def obter_anos_disponiveis(df_checklist):
 
 def obter_meses_disponiveis(df_checklist, ano_selecionado):
     """Retorna todos os meses (1-12) independentemente dos dados existentes"""
-    # Lista completa de todos os meses do ano
     nomes_meses = {
         1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 
         5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 
         9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
     }
     
-    # Retorna todos os meses de 1 a 12
     return [{'label': f'{nomes_meses[m]}', 'value': m} for m in range(1, 13)]
 
 # ========== CARREGAR DADOS ==========
@@ -1068,7 +1078,6 @@ print(f"\nDEBUG: Anos disponíveis no filtro: {anos_disponiveis}")
 app = Dash(__name__)
 
 # ========== APLICAR AUTENTICAÇÃO ==========
-# Esta linha DEVE vir DEPOIS de criar a app e ANTES do layout
 auth = dash_auth.BasicAuth(app, USUARIOS_VALIDOS)
 
 # ========== LAYOUT DO DASHBOARD ==========
@@ -1282,7 +1291,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'Status_Prazo': 'Status do Prazo'
             })
             
-            # Criar tabela com cores condicionais - FONTE MENOR
+            # Criar tabela com cores condicionais
             tabela_nao_conforme = dash_table.DataTable(
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
@@ -1305,11 +1314,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'minWidth': '50px'
                 },
                 style_data_conditional=[
-                    # Linhas pares
                     {'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
-                    # Linhas ímpares
                     {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'},
-                    # Cores condicionais para Status do Prazo
                     {
                         'if': {
                             'filter_query': '{Status do Prazo} = "Concluído no Prazo"',
@@ -1448,9 +1454,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         
         df_risco_filtrado = df_risco.copy()
         
-        # Aplicar APENAS filtro de ano para a matriz de risco
-        filtros_aplicados = False
-        
+        # Aplicar filtros para matriz de risco
         if 'Ano' in df_risco_filtrado.columns:
             df_risco_filtrado['Ano'] = pd.to_numeric(df_risco_filtrado['Ano'], errors='coerce')
         
@@ -1460,7 +1464,6 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 ano_int = int(ano)
                 df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
                 print(f"  ✅ Filtro ANO aplicado para matriz de risco: {ano_int}")
-                filtros_aplicados = True
             except:
                 pass
         
@@ -1468,7 +1471,6 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
             df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
             print(f"  ✅ Filtro UNIDADE aplicado para matriz de risco: '{unidade}'")
-            filtros_aplicados = True
         
         # NÃO aplicar filtro de mês para a matriz de risco (mostrar ano completo)
 
@@ -1593,7 +1595,6 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         ]),
         kpis,
         tabela_titulo,
-        # KPIs de PRAZOS dos Itens Não Conformes
         kpis_prazos,
         legenda_prazo,
         tabela_nao_conforme,
@@ -1607,10 +1608,14 @@ if __name__ == '__main__':
     print("  - ✅ Gráfico de pizza REMOVIDO")
     print("  - ✅ KPIs de PRAZOS para itens não conformes")
     print("  - ✅ Matriz de risco COM SIGLAS VISÍVEIS (TODAS)")
-    print("  - ✅ Lista completa de siglas e relatórios embaixo")
+    print("  - ✅ Lista completa de relatórios ÚNICOS embaixo")
+    print("  - ✅ Cada relatório aparece APENAS UMA VEZ")
+    print("  - ✅ Mostra todas as unidades/meses onde o relatório aparece")
     print("  - ✅ Organizado por status")
     print("  - ✅ Sem necessidade de passar mouse")
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+  
+          
