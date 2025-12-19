@@ -10,12 +10,57 @@ import re
 print("🚀 Iniciando Dashboard de Auditoria...")
 
 # ========== CONFIGURAÇÃO DE AUTENTICAÇÃO ==========
-# Defina os usuários e senhas aqui
-# Formato: 'usuário': 'senha'
 USUARIOS_VALIDOS = {
-    'admin': 'wne@2026',    # ALTERE PARA SUA SENHA SEGURA
-    'diretoria': 'lagoa@2026'     # ALTERE PARA SUA SENHA SEGURA
+    'admin': 'wne@2026',
+    'diretoria': 'lagoa@2026'
 }
+
+# ========== DICIONÁRIO DE SIGLAS FORNECIDAS PELO USUÁRIO ==========
+DICIONARIO_SIGLAS = {
+    'BM': 'Baixas Manuais',
+    'BO': 'Bonificações',
+    'FF': 'Faturamento sem Financeiro',
+    'PR': 'Prorrogação',
+    'PM': 'Pagamento Manual',
+    'TM': 'Títulos Pagos a Menor',
+    'RJ': 'Recebimento sem Juros',
+    'VD': 'Vendas',
+    'DC': 'Descontos Concedidos',
+    
+    # SIGLAS ADICIONAIS PARA COMPLETAR
+    'CL': 'Checklist',
+    'AU': 'Auditoria',
+    'NC': 'Não Conformidade',
+    'MT': 'Monitoramento',
+    'AD': 'Análise Documental',
+    'RE': 'Relatório',
+    'CH': 'Check',
+    'IN': 'Inspeção',
+    'VI': 'Visita',
+    'RA': 'Risco Alto',
+    'RM': 'Risco Médio',
+    'RB': 'Risco Baixo',
+    'RP': 'Risco Potencial',
+    'RC': 'Risco Crítico',
+    'RV': 'Risco Vulnerabilidade'
+}
+
+def obter_significado_sigla(sigla):
+    """Retorna o significado de uma sigla, ou a própria sigla se não encontrada"""
+    sigla_upper = str(sigla).strip().upper()
+    
+    # Verifica se a sigla completa está no dicionário
+    if sigla_upper in DICIONARIO_SIGLAS:
+        return DICIONARIO_SIGLAS[sigla_upper]
+    
+    # Se não encontrou, verifica as 2 primeiras letras
+    if len(sigla_upper) >= 2:
+        sigla_2 = sigla_upper[:2]
+        if sigla_2 in DICIONARIO_SIGLAS:
+            return DICIONARIO_SIGLAS[sigla_2]
+    
+    # Se ainda não encontrou, retorna a sigla original
+    return sigla_upper
 
 # ========== HELPERS ==========
 def normalize_colname(name: str) -> str:
@@ -39,7 +84,6 @@ def canonical_status(s):
     s = str(s).strip()
     s_lower = s.lower()
     
-    # Mapeamento direto para os status do checklist
     if s_lower in ['conforme', 'c']:
         return "Conforme"
     elif s_lower in ['conforme parcialmente', 'parcialmente', 'parcial', 'conforme parcial']:
@@ -53,7 +97,6 @@ def canonical_status(s):
     elif s_lower in ['não iniciado', 'nao iniciado', '']:
         return "Não Iniciado"
     else:
-        # Para qualquer outra coisa, capitaliza a primeira letra
         return s.title()
 
 def get_status_color(status):
@@ -106,18 +149,15 @@ def get_status_color(status):
 def calcular_status_prazo(prazo_str, finalizacao_str):
     """Calcula o status baseado no prazo e data de finalização"""
     try:
-        # Se não tem data de finalização
         if pd.isna(finalizacao_str) or str(finalizacao_str).strip() in ['', 'NaT', 'None']:
             return "Não Concluído"
         
-        # Converter strings para datetime
         prazo = pd.to_datetime(prazo_str, errors='coerce', dayfirst=True)
         finalizacao = pd.to_datetime(finalizacao_str, errors='coerce', dayfirst=True)
         
         if pd.isna(prazo) or pd.isna(finalizacao):
             return "Não Concluído"
         
-        # Comparar datas
         if finalizacao <= prazo:
             return "Concluído no Prazo"
         else:
@@ -132,15 +172,12 @@ def formatar_data(data_str):
         if pd.isna(data_str) or str(data_str).strip() in ['', 'NaT', 'None']:
             return ""
         
-        # Se já for um objeto datetime, formata diretamente
         if isinstance(data_str, (pd.Timestamp, datetime)):
             return data_str.strftime('%d/%m/%Y')
         
-        # Se for string, tenta converter para datetime primeiro
-        # dayfirst=True ajuda no formato brasileiro (dd/mm/aaaa)
         data = pd.to_datetime(data_str, errors='coerce', dayfirst=True)
         if pd.isna(data):
-            return str(data_str)  # Retorna original se não puder converter
+            return str(data_str)
         
         return data.strftime('%d/%m/%Y')
     except Exception as e:
@@ -148,59 +185,76 @@ def formatar_data(data_str):
         return str(data_str)
 
 def criar_sigla_relatorio(relatorio, index):
-    """Cria uma sigla única para o relatório baseada no nome ou índice"""
+    """Cria uma sigla para o relatório - versão simplificada para usar siglas do dicionário"""
     if pd.isna(relatorio) or str(relatorio).strip() == '':
         return f"R{index:03d}"
     
     relatorio_str = str(relatorio).strip().upper()
     
-    # Tenta extrair sigla de padrões comuns
-    # Padrão: "AUD-2023-001" -> "A23001"
-    padrao_aud = re.match(r'([A-Z]{2,})-(\d{2,4})-(\d{2,})', relatorio_str)
-    if padrao_aud:
-        prefixo = padrao_aud.group(1)[:2]  # Primeiras 2 letras
-        ano = padrao_aud.group(2)[-2:]     # Últimos 2 dígitos do ano
-        numero = padrao_aud.group(3)[:3]   # Primeiros 3 dígitos do número
-        return f"{prefixo}{ano}{numero}"
+    # Procura por palavras-chave que correspondam às siglas conhecidas
+    palavras_chave = {
+        'BAIXA': 'BM',
+        'MANUAL': 'BM',
+        'BONIF': 'BO',
+        'BONIFICA': 'BO',
+        'FATURAMENTO': 'FF',
+        'FINANCEIRO': 'FF',
+        'PRORROGA': 'PR',
+        'PAGAMENTO': 'PM',
+        'MANUAL': 'PM',
+        'TITULO': 'TM',
+        'MENOR': 'TM',
+        'RECEBIMENTO': 'RJ',
+        'JUROS': 'RJ',
+        'VENDA': 'VD',
+        'DESCONTO': 'DC',
+        'CONCEDIDO': 'DC',
+        'CHECKLIST': 'CL',
+        'AUDITORIA': 'AU',
+        'NÃO CONFORME': 'NC',
+        'NAO CONFORME': 'NC',
+        'MONITORAMENTO': 'MT',
+        'ANALISE': 'AD',
+        'ANÁLISE': 'AD',
+        'RELATORIO': 'RE',
+        'RELATÓRIO': 'RE',
+        'CHECK': 'CH',
+        'INSPECAO': 'IN',
+        'INSPEÇÃO': 'IN',
+        'VISITA': 'VI'
+    }
     
-    # Padrão: "RELATORIO 2023-001" -> "R23001"
-    padrao_rel = re.match(r'RELATORIO\s*(\d{2,4})-?(\d{2,})', relatorio_str, re.IGNORECASE)
-    if padrao_rel:
-        ano = padrao_rel.group(1)[-2:]
-        numero = padrao_rel.group(2)[:3]
-        return f"R{ano}{numero}"
+    # Verifica se alguma palavra-chave está no nome do relatório
+    for palavra, sigla in palavras_chave.items():
+        if palavra in relatorio_str:
+            return sigla
     
-    # Padrão: "AUDITORIA JANEIRO 2023" -> "AJAN23"
-    palavras = re.findall(r'[A-Z]{2,}', relatorio_str)
-    if palavras and len(palavras[0]) >= 2:
-        primeira_palavra = palavras[0][:2]
-        
-        # Tenta extrair ano
-        anos = re.findall(r'\b(20\d{2})\b', relatorio_str)
-        if anos:
-            ano_short = anos[0][-2:]
-            return f"{primeira_palavra}{ano_short}"
-    
-    # Se não encontrou padrão, cria sigla baseada nas primeiras letras
+    # Se não encontrou palavra-chave, tenta extrair sigla do início do nome
     palavras = relatorio_str.split()
     if palavras:
-        # Pega primeira letra de cada palavra (até 3 palavras)
-        sigla = ''.join([p[0] for p in palavras[:3] if len(p) > 0])
-        if len(sigla) >= 2:
-            # Adiciona índice para garantir unicidade
-            return f"{sigla[:3]}{index:02d}"
+        # Tenta combinar primeiras letras com siglas conhecidas
+        primeira_palavra = palavras[0]
+        if len(primeira_palavra) >= 2:
+            sigla_tentativa = primeira_palavra[:2].upper()
+            if sigla_tentativa in DICIONARIO_SIGLAS:
+                return sigla_tentativa
+        
+        # Tenta criar sigla com iniciais
+        if len(palavras) >= 2:
+            sigla_tentativa = ''.join([p[0] for p in palavras[:2]])
+            if sigla_tentativa in DICIONARIO_SIGLAS:
+                return sigla_tentativa
     
-    # Último recurso: usa as primeiras letras do relatório
-    if len(relatorio_str) >= 3:
-        return f"{relatorio_str[:3]}{index:02d}"
+    # Se nada funcionou, usa as 2 primeiras letras da primeira palavra
+    if palavras:
+        return palavras[0][:2].upper()
     
-    # Se tudo falhar, usa o índice
-    return f"REL{index:03d}"
+    # Último recurso
+    return f"R{index:03d}"
 
 def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
-    """Cria matriz de risco com todas as siglas visíveis e lista completa embaixo (relatórios únicos)"""
+    """Cria matriz de risco com siglas visíveis na tabela e lista de significados embaixo"""
     
-    # Verificar se temos dados
     if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
         return html.Div([
             html.H3("📋 Matriz Auditoria Risco"),
@@ -217,22 +271,13 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         1: 'JAN', 2: 'FEV', 3: 'MAR', 4: 'ABR', 5: 'MAI', 6: 'JUN',
         7: 'JUL', 8: 'AGO', 9: 'SET', 10: 'OUT', 11: 'NOV', 12: 'DEZ'
     }
-    nomes_completos = {
-        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 
-        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
-        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
-    }
     
     print(f"\n📊 CRIANDO MATRIZ DE RISCO PARA O ANO {ano_filtro}")
     print(f"  Unidades: {unidades}")
     print(f"  Total de registros: {len(df_risco_filtrado)}")
     
-    # Dicionário para armazenar relatórios únicos
-    # Chave: (sigla, relatorio) -> informação do relatório
-    relatorios_unicos = {}
-    
-    # Para mapeamento rápido de sigla para relatório completo
-    sigla_para_relatorio = {}
+    # Conjunto para armazenar siglas únicas encontradas
+    siglas_encontradas = set()
     
     # Criar estrutura de dados para a matriz
     matriz_data = []
@@ -248,66 +293,61 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             
             if len(df_mes) > 0:
                 # Para cada relatório no mês
-                relatorios_info = []
+                siglas_no_mes = []
                 
                 for _, row in df_mes.iterrows():
-                    relatorio = str(row.get('Relatorio', ''))
-                    sigla = str(row.get('Sigla', 'REL'))
+                    sigla = str(row.get('Sigla', '')).strip().upper()
                     status = str(row.get('Status', 'Sem Status'))
-                    cores = get_status_color(status)
                     
-                    # Armazenar mapeamento sigla -> relatório (apenas uma vez)
-                    if sigla not in sigla_para_relatorio:
-                        sigla_para_relatorio[sigla] = relatorio
-                    
-                    # Armazenar/atualizar relatório único
-                    chave_relatorio = (sigla, relatorio)
-                    if chave_relatorio not in relatorios_unicos:
-                        relatorios_unicos[chave_relatorio] = {
+                    if sigla:  # Só adiciona se tiver sigla
+                        # Adicionar ao conjunto de siglas encontradas
+                        siglas_encontradas.add(sigla)
+                        
+                        # Obter cor baseada no status
+                        cores = get_status_color(status)
+                        
+                        # Armazenar sigla para este mês
+                        siglas_no_mes.append({
                             'sigla': sigla,
-                            'relatorio': relatorio,
                             'status': status,
-                            'unidades': set([unidade_nome]),
-                            'meses': set([mes])
-                        }
-                    else:
-                        # Se já existe, adicionar unidade e mês
-                        relatorios_unicos[chave_relatorio]['unidades'].add(unidade_nome)
-                        relatorios_unicos[chave_relatorio]['meses'].add(mes)
+                            'cor': cores
+                        })
+                
+                if siglas_no_mes:
+                    # Ordenar siglas alfabeticamente
+                    siglas_no_mes.sort(key=lambda x: x['sigla'])
                     
-                    # Criar elemento com a SIGLA visível
-                    relatorio_item = html.Div([
-                        html.Div(
-                            sigla,
+                    # Criar container para as siglas
+                    siglas_html = []
+                    for item in siglas_no_mes:
+                        siglas_html.append(html.Div(
+                            item['sigla'],
                             style={
-                                'fontSize': '9px',
+                                'fontSize': '10px',
                                 'fontWeight': 'bold',
-                                'color': cores['text_color'],
+                                'color': item['cor']['text_color'],
                                 'textAlign': 'center',
-                                'backgroundColor': cores['bg_color'],
-                                'padding': '2px 3px',
+                                'backgroundColor': item['cor']['bg_color'],
+                                'padding': '2px 4px',
                                 'margin': '1px',
-                                'borderRadius': '2px',
-                                'border': f'1px solid {cores["border_color"]}',
-                                'minWidth': '40px',
-                                'maxWidth': '45px',
-                                'height': '22px',
+                                'borderRadius': '3px',
+                                'border': f'1px solid {item["cor"]["border_color"]}',
+                                'minWidth': '35px',
+                                'maxWidth': '40px',
+                                'height': '25px',
                                 'display': 'flex',
                                 'alignItems': 'center',
                                 'justifyContent': 'center',
                                 'cursor': 'default'
                             }
-                        )
-                    ], style={'display': 'inline-block'})
-                    relatorios_info.append(relatorio_item)
-                
-                if len(relatorios_info) > 0:
-                    # Criar container para todas as siglas do mês
-                    if len(relatorios_info) > 4:
-                        # Se tiver muitas siglas, mostrar as primeiras 4 e indicador
+                        ))
+                    
+                    # Organizar siglas em grid
+                    if len(siglas_html) > 4:
+                        # Mostrar as primeiras 4 + contador
                         linha[mes] = html.Div([
-                            html.Div(relatorios_info[:4], style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, 1fr)', 'gap': '2px'}),
-                            html.Div(f"+{len(relatorios_info)-4}", style={
+                            html.Div(siglas_html[:4], style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, 1fr)', 'gap': '2px'}),
+                            html.Div(f"+{len(siglas_html)-4}", style={
                                 'fontSize': '8px',
                                 'backgroundColor': '#3498db',
                                 'color': 'white',
@@ -317,31 +357,15 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                                 'fontWeight': 'bold',
                                 'textAlign': 'center'
                             })
-                        ], style={
-                            'display': 'flex',
-                            'flexDirection': 'column',
-                            'alignItems': 'center',
-                            'justifyContent': 'center',
-                            'padding': '3px'
-                        })
+                        ], style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'padding': '3px'})
                     else:
                         # Mostrar todas as siglas
-                        if len(relatorios_info) <= 2:
-                            linha[mes] = html.Div(relatorios_info, style={
-                                'display': 'flex',
-                                'flexDirection': 'column',
-                                'alignItems': 'center',
-                                'justifyContent': 'center',
-                                'gap': '2px',
-                                'padding': '3px'
-                            })
-                        else:
-                            linha[mes] = html.Div(relatorios_info, style={
-                                'display': 'grid',
-                                'gridTemplateColumns': 'repeat(2, 1fr)',
-                                'gap': '2px',
-                                'padding': '3px'
-                            })
+                        if len(siglas_html) == 1:
+                            linha[mes] = html.Div(siglas_html, style={'display': 'flex', 'justifyContent': 'center', 'padding': '3px'})
+                        elif len(siglas_html) == 2:
+                            linha[mes] = html.Div(siglas_html, style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, 1fr)', 'gap': '2px', 'padding': '3px'})
+                        elif len(siglas_html) in [3, 4]:
+                            linha[mes] = html.Div(siglas_html, style={'display': 'grid', 'gridTemplateColumns': 'repeat(2, 1fr)', 'gap': '2px', 'padding': '3px'})
                 else:
                     linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px', 'padding': '10px 0'})
             else:
@@ -349,8 +373,8 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         
         matriz_data.append(linha)
     
-    # Criar lista de siglas únicas
-    siglas_unicas = sorted(sigla_para_relatorio.keys())
+    # Ordenar siglas encontradas alfabeticamente
+    siglas_ordenadas = sorted(siglas_encontradas)
     
     # Criar tabela HTML com siglas visíveis
     tabela_cabecalho = [html.Th("UNIDADE", style={
@@ -460,156 +484,39 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         }
     )
     
-    # Preparar lista de relatórios únicos
-    lista_relatorios = []
-    for info in relatorios_unicos.values():
-        lista_relatorios.append(info)
+    # Criar lista de siglas e seus significados
+    lista_siglas = []
     
-    # Agrupar por status
-    relatorios_por_status = {
-        'Não Iniciado': [],
-        'Pendente': [],
-        'Finalizado': [],
-        'Conforme': [],
-        'Conforme Parcialmente': [],
-        'Não Conforme': [],
-        'Outros': []
-    }
+    for sigla in siglas_ordenadas:
+        significado = obter_significado_sigla(sigla)
+        lista_siglas.append(html.Div([
+            html.Span(f"{sigla}: ", style={
+                'fontWeight': 'bold',
+                'color': '#2c3e50',
+                'fontSize': '12px',
+                'minWidth': '40px',
+                'display': 'inline-block'
+            }),
+            html.Span(significado, style={
+                'color': '#7f8c8d',
+                'fontSize': '12px'
+            })
+        ], style={
+            'marginBottom': '5px',
+            'padding': '5px 10px',
+            'borderBottom': '1px solid #f0f0f0',
+            'backgroundColor': '#f8f9fa',
+            'borderRadius': '3px'
+        }))
     
-    for relatorio_info in lista_relatorios:
-        status = relatorio_info['status']
-        
-        # Formatar unidades e meses
-        unidades_str = ', '.join(sorted(relatorio_info['unidades']))
-        meses_list = sorted(relatorio_info['meses'])
-        meses_str = ', '.join([nomes_completos.get(m, f"Mês {m}") for m in meses_list])
-        
-        relatorio_formatado = {
-            'sigla': relatorio_info['sigla'],
-            'relatorio': relatorio_info['relatorio'],
-            'unidades': unidades_str,
-            'meses': meses_str
-        }
-        
-        # Classificar por status
-        status_lower = status.lower()
-        if 'não iniciado' in status_lower or 'nao iniciado' in status_lower:
-            relatorios_por_status['Não Iniciado'].append(relatorio_formatado)
-        elif 'pendente' in status_lower:
-            relatorios_por_status['Pendente'].append(relatorio_formatado)
-        elif 'finalizado' in status_lower:
-            relatorios_por_status['Finalizado'].append(relatorio_formatado)
-        elif 'conforme' in status_lower:
-            if 'parcial' in status_lower:
-                relatorios_por_status['Conforme Parcialmente'].append(relatorio_formatado)
-            else:
-                relatorios_por_status['Conforme'].append(relatorio_formatado)
-        elif 'não conforme' in status_lower or 'nao conforme' in status_lower:
-            relatorios_por_status['Não Conforme'].append(relatorio_formatado)
-        else:
-            relatorios_por_status['Outros'].append(relatorio_formatado)
+    # Se não encontrou siglas conhecidas, mostrar mensagem
+    if not siglas_encontradas:
+        lista_siglas = [html.P("Nenhuma sigla conhecida encontrada nos dados.", 
+                               style={'color': '#7f8c8d', 'fontSize': '12px', 'textAlign': 'center', 'padding': '10px'})]
     
-    # Criar containers por status
-    containers_status = []
-    
-    for status_nome, relatorios in relatorios_por_status.items():
-        if relatorios:
-            # Ordenar por sigla
-            relatorios_ordenados = sorted(relatorios, key=lambda x: x['sigla'])
-            
-            # Dividir em colunas para melhor visualização
-            colunas = []
-            relatorios_por_coluna = 10  # Aproximadamente 10 itens por coluna
-            
-            for i in range(0, len(relatorios_ordenados), relatorios_por_coluna):
-                coluna_relatorios = relatorios_ordenados[i:i + relatorios_por_coluna]
-                
-                lista_coluna = []
-                for relatorio in coluna_relatorios:
-                    cores = get_status_color(status_nome)
-                    
-                    lista_coluna.append(html.Div([
-                        html.Span(f"{relatorio['sigla']}: ", style={
-                            'fontWeight': 'bold',
-                            'color': cores['text_color'],
-                            'fontSize': '10px',
-                            'minWidth': '50px',
-                            'display': 'inline-block',
-                            'backgroundColor': cores['bg_color'],
-                            'padding': '2px 4px',
-                            'borderRadius': '2px',
-                            'border': f'1px solid {cores["border_color"]}',
-                            'marginRight': '5px'
-                        }),
-                        html.Span(f"{relatorio['relatorio'][:35]}", style={
-                            'color': '#2c3e50',
-                            'fontSize': '10px',
-                            'overflow': 'hidden',
-                            'textOverflow': 'ellipsis',
-                            'whiteSpace': 'nowrap',
-                            'maxWidth': '200px',
-                            'display': 'inline-block'
-                        }),
-                        html.Div([
-                            html.Span(f"Unidades: {relatorio['unidades']}", style={
-                                'color': '#7f8c8d',
-                                'fontSize': '9px',
-                                'fontStyle': 'italic'
-                            }),
-                            html.Span(f" | Meses: {relatorio['meses']}", style={
-                                'color': '#7f8c8d',
-                                'fontSize': '9px',
-                                'fontStyle': 'italic'
-                            })
-                        ], style={'marginTop': '2px'})
-                    ], style={
-                        'marginBottom': '8px',
-                        'padding': '5px',
-                        'borderBottom': '1px solid #f0f0f0',
-                        'backgroundColor': '#f8f9fa',
-                        'borderRadius': '3px'
-                    }))
-                
-                colunas.append(html.Div(lista_coluna, style={
-                    'flex': '1',
-                    'minWidth': '280px',
-                    'marginRight': '15px'
-                }))
-            
-            # Container para este status
-            status_color_map = {
-                'Não Iniciado': '#c0392b',
-                'Pendente': '#f39c12',
-                'Finalizado': '#27ae60',
-                'Conforme': '#27ae60',
-                'Conforme Parcialmente': '#f39c12',
-                'Não Conforme': '#c0392b',
-                'Outros': '#7f8c8d'
-            }
-            
-            cor_status = status_color_map.get(status_nome, '#7f8c8d')
-            
-            containers_status.append(html.Div([
-                html.H5(f"📋 {status_nome.upper()} ({len(relatorios)} relatórios)", style={
-                    'color': cor_status,
-                    'marginBottom': '10px',
-                    'fontSize': '12px',
-                    'borderBottom': f'2px solid {cor_status}',
-                    'paddingBottom': '3px',
-                    'fontWeight': 'bold'
-                }),
-                html.Div(colunas, style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px'})
-            ], style={
-                'backgroundColor': '#f8f9fa',
-                'padding': '12px 15px',
-                'borderRadius': '4px',
-                'marginBottom': '15px',
-                'border': f'1px solid {cor_status}20'
-            }))
-    
-    # Container da lista completa
-    lista_completa_container = html.Div([
-        html.H4("📋 LISTA COMPLETA DE RELATÓRIOS (ÚNICOS)", style={
+    # Container da lista de siglas
+    lista_siglas_container = html.Div([
+        html.H4("📚 LEGENDA DE SIGLAS", style={
             'marginBottom': '15px',
             'color': '#2c3e50',
             'fontSize': '14px',
@@ -619,9 +526,9 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'borderRadius': '4px',
             'border': '1px solid #bdc3c7'
         }),
-        html.P(f"Total de {len(lista_relatorios)} relatórios únicos encontrados", 
+        html.P(f"Total de {len(siglas_encontradas)} siglas distintas encontradas", 
                style={'color': '#7f8c8d', 'marginBottom': '10px', 'fontSize': '11px', 'textAlign': 'center'}),
-        html.Div(containers_status, style={'maxHeight': '350px', 'overflowY': 'auto', 'padding': '5px'})
+        html.Div(lista_siglas, style={'maxHeight': '200px', 'overflowY': 'auto', 'padding': '10px'})
     ], style={
         'marginTop': '20px',
         'padding': '15px',
@@ -633,7 +540,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
     
     # Legenda de cores
     legenda_cores = html.Div([
-        html.P("🎨 LEGENDA DE CORES:", style={
+        html.P("🎨 LEGENDA DE STATUS:", style={
             'marginBottom': '8px',
             'color': '#2c3e50',
             'fontSize': '11px',
@@ -697,7 +604,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'fontSize': '11px'
     })
     
-    titulo_matriz = f"📋 MATRIZ DE RISCO - {ano_filtro} ({len(df_risco_filtrado)} registros, {len(lista_relatorios)} relatórios únicos)"
+    titulo_matriz = f"📋 MATRIZ DE RISCO - {ano_filtro} ({len(df_risco_filtrado)} registros)"
     
     return html.Div([
         html.H4(titulo_matriz, style={
@@ -712,12 +619,12 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'borderRadius': '4px'
         }),
         legenda_cores,
-        html.P("📊 Matriz: Cada célula mostra as siglas dos relatórios daquela unidade/mês", 
+        html.P("📊 MATRIZ: Cada célula mostra as SIGLAS dos relatórios daquela unidade/mês", 
                style={'color': '#7f8c8d', 'marginBottom': '10px', 'fontSize': '11px'}),
-        html.P("📋 Lista: Cada relatório aparece apenas UMA VEZ com todas as unidades/meses onde aparece", 
+        html.P("📚 LEGENDA: Lista de significados das siglas encontradas", 
                style={'color': '#7f8c8d', 'marginBottom': '10px', 'fontSize': '11px'}),
         tabela_container,
-        lista_completa_container
+        lista_siglas_container
     ], style={
         'marginTop': '20px',
         'padding': '15px',
@@ -838,10 +745,6 @@ def carregar_dados_da_planilha():
                     if coluna_data:
                         print(f"\n  ✅ Coluna de Data encontrada: '{coluna_data}'")
                         print(f"  Tipo da coluna Data: {df[coluna_data].dtype}")
-                        print(f"  Amostra de 10 datas brutas:")
-                        datas_amostra = df[coluna_data].head(10).tolist()
-                        for j, data in enumerate(datas_amostra):
-                            print(f"    {j+1:2d}. '{data}' (tipo: {type(data)})")
                         
                         # Converter datas para datetime
                         print(f"\n  🔍 Convertendo datas para datetime...")
@@ -938,12 +841,6 @@ def carregar_dados_da_planilha():
                             axis=1
                         )
                         
-                        # Mostrar distribuição de Mes_Ano
-                        print(f"\n  📊 DISTRIBUIÇÃO DE MES_ANO:")
-                        distribuicao = df['Mes_Ano'].value_counts().sort_index()
-                        for mes_ano, contagem in distribuicao.items():
-                            print(f"     {mes_ano}: {contagem} registros")
-                        
                         # Formatar data para exibição
                         df['Data_Formatada'] = df['Data_DT'].apply(
                             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
@@ -968,7 +865,7 @@ def carregar_dados_da_planilha():
                     if coluna_relatorio:
                         print(f"  ✅ Coluna de Relatório encontrada: '{coluna_relatorio}'")
                         df['Relatorio'] = df[coluna_relatorio].astype(str)
-                        # Criar siglas para os relatórios
+                        # Criar siglas para os relatórios usando o dicionário
                         print(f"  🔤 Criando siglas para os relatórios...")
                         siglas = []
                         for idx, relatorio in enumerate(df['Relatorio']):
@@ -982,7 +879,7 @@ def carregar_dados_da_planilha():
                         # Criar siglas padrão
                         siglas = []
                         for idx in range(len(df)):
-                            siglas.append(f"REL{idx:03d}")
+                            siglas.append(f"R{idx:03d}")
                         df['Sigla'] = siglas
                     
                     # 4. Garantir coluna Unidade
@@ -1607,15 +1504,11 @@ if __name__ == '__main__':
     print("📊 DASHBOARD OTIMIZADO:")
     print("  - ✅ Gráfico de pizza REMOVIDO")
     print("  - ✅ KPIs de PRAZOS para itens não conformes")
-    print("  - ✅ Matriz de risco COM SIGLAS VISÍVEIS (TODAS)")
-    print("  - ✅ Lista completa de relatórios ÚNICOS embaixo")
-    print("  - ✅ Cada relatório aparece APENAS UMA VEZ")
-    print("  - ✅ Mostra todas as unidades/meses onde o relatório aparece")
-    print("  - ✅ Organizado por status")
-    print("  - ✅ Sem necessidade de passar mouse")
+    print("  - ✅ Matriz de risco com apenas SIGLAS (BM, RJ, VD, etc.)")
+    print("  - ✅ Legenda de significados das siglas embaixo")
+    print("  - ✅ Cores por status (Não Iniciado, Pendente, Finalizado)")
+    print("  - ✅ Organização em grid 2x2 nas células da matriz")
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-  
-          
