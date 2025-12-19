@@ -463,7 +463,7 @@ def obter_meses_disponiveis(df_checklist, ano_selecionado):
     return [{'label': f'{nomes_meses[m]}', 'value': m} for m in range(1, 13)]
 
 def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
-    """Cria matriz de risco com todos os meses do ano - VERSÃO COMPACTA"""
+    """Cria matriz de risco com todos os meses do ano - NOMES VISÍVEIS"""
     
     # Verificar se temos dados
     if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
@@ -479,8 +479,8 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
     # Lista de meses do ano (1 a 12)
     meses_ano = list(range(1, 13))
     nomes_meses = {
-        1: 'J', 2: 'F', 3: 'M', 4: 'A', 5: 'M', 6: 'J',
-        7: 'J', 8: 'A', 9: 'S', 10: 'O', 11: 'N', 12: 'D'
+        1: 'JAN', 2: 'FEV', 3: 'MAR', 4: 'ABR', 5: 'MAI', 6: 'JUN',
+        7: 'JUL', 8: 'AGO', 9: 'SET', 10: 'OUT', 11: 'NOV', 12: 'DEZ'
     }
     nomes_completos = {
         1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 
@@ -512,83 +512,130 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     status = str(row.get('Status', 'Sem Status'))
                     cores = get_status_color(status)
                     
-                    # Se o relatório for muito longo, abreviar
-                    if len(relatorio) > 20:
-                        relatorio_display = relatorio[:18] + '...'
+                    # Extrair número ou código do relatório
+                    # Tenta extrair números do relatório
+                    import re
+                    numeros = re.findall(r'\d+', relatorio)
+                    if numeros:
+                        codigo = numeros[0][:3]  # Pega os primeiros 3 dígitos
                     else:
-                        relatorio_display = relatorio
+                        # Se não tem números, pega as primeiras letras
+                        palavras = relatorio.split()
+                        if palavras:
+                            codigo = palavras[0][:3]
+                        else:
+                            codigo = "REL"
                     
-                    # Criar tooltip com info completa
-                    relatorio_item = html.Span(
-                        "•",  # Ponto simples como marcador
-                        title=f"{relatorio} | Status: {status}",
-                        style={
-                            'display': 'inline-block',
-                            'backgroundColor': cores['bg_color'],
-                            'color': cores['text_color'],
-                            'padding': '2px 4px',
-                            'margin': '1px',
-                            'borderRadius': '2px',
-                            'fontSize': '10px',
-                            'fontWeight': 'bold',
-                            'borderLeft': f'2px solid {cores["border_color"]}',
-                            'cursor': 'pointer'
-                        }
-                    )
+                    # Criar elemento com o código/nome visível
+                    relatorio_item = html.Div([
+                        html.Div(
+                            codigo.upper(),
+                            style={
+                                'fontSize': '9px',
+                                'fontWeight': 'bold',
+                                'color': cores['text_color'],
+                                'textAlign': 'center',
+                                'overflow': 'hidden',
+                                'textOverflow': 'ellipsis',
+                                'whiteSpace': 'nowrap'
+                            }
+                        ),
+                        html.Div(
+                            "●",
+                            style={
+                                'fontSize': '8px',
+                                'color': cores['border_color'],
+                                'textAlign': 'center',
+                                'marginTop': '1px'
+                            }
+                        )
+                    ],
+                    title=f"{relatorio}\nStatus: {status}\nMês: {nomes_completos[mes]}",
+                    style={
+                        'display': 'flex',
+                        'flexDirection': 'column',
+                        'justifyContent': 'center',
+                        'alignItems': 'center',
+                        'backgroundColor': cores['bg_color'],
+                        'padding': '3px 2px',
+                        'margin': '1px',
+                        'borderRadius': '2px',
+                        'border': f'1px solid {cores["border_color"]}',
+                        'cursor': 'help',
+                        'minWidth': '35px',
+                        'maxWidth': '40px',
+                        'height': '35px'
+                    })
                     relatorios_info.append(relatorio_item)
                 
                 if len(relatorios_info) > 0:
-                    # Agrupar em uma célula compacta
-                    linha[mes] = html.Div(
-                        relatorios_info,
-                        style={
+                    # Se houver mais de 1 relatório, mostrar contagem
+                    if len(relatorios_info) > 1:
+                        contador = html.Div(
+                            f"+{len(relatorios_info)-1}",
+                            style={
+                                'fontSize': '8px',
+                                'backgroundColor': '#e74c3c',
+                                'color': 'white',
+                                'padding': '1px 3px',
+                                'borderRadius': '2px',
+                                'marginLeft': '2px',
+                                'fontWeight': 'bold'
+                            },
+                            title=f"Total: {len(relatorios_info)} relatórios neste mês"
+                        )
+                        
+                        # Mostrar apenas o primeiro relatório + contador
+                        linha[mes] = html.Div([
+                            relatorios_info[0],
+                            contador
+                        ], style={
                             'display': 'flex',
-                            'flexWrap': 'wrap',
-                            'gap': '1px',
-                            'justifyContent': 'center',
                             'alignItems': 'center',
-                            'minHeight': '25px',
-                            'maxWidth': '80px'
-                        }
-                    )
+                            'justifyContent': 'center',
+                            'gap': '2px'
+                        })
+                    else:
+                        # Apenas um relatório
+                        linha[mes] = relatorios_info[0]
                 else:
-                    linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px'})
+                    linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px', 'padding': '10px 0'})
             else:
-                linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px'})
+                linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px', 'padding': '10px 0'})
         
         matriz_data.append(linha)
     
-    # Criar tabela HTML COMPACTA
-    tabela_cabecalho = [html.Th("Unidade", style={
-        'backgroundColor': '#34495e',
+    # Criar tabela HTML com nomes visíveis
+    tabela_cabecalho = [html.Th("UNIDADE", style={
+        'backgroundColor': '#2c3e50',
         'color': 'white',
-        'padding': '6px 8px',
+        'padding': '8px 10px',
         'textAlign': 'center',
         'fontWeight': 'bold',
         'border': '1px solid #2c3e50',
-        'minWidth': '100px',
-        'maxWidth': '120px',
-        'fontSize': '11px',
+        'minWidth': '120px',
+        'maxWidth': '150px',
+        'fontSize': '12px',
         'position': 'sticky',
         'left': '0',
-        'zIndex': '1'
+        'zIndex': '2'
     })]
     
     for mes in meses_ano:
         tabela_cabecalho.append(html.Th(
             html.Div([
                 html.Div(nomes_meses[mes], style={'fontSize': '11px', 'fontWeight': 'bold'}),
-                html.Div(str(mes), style={'fontSize': '9px', 'opacity': '0.7'})
+                html.Div(str(mes), style={'fontSize': '9px', 'opacity': '0.8'})
             ]),
             style={
-                'backgroundColor': '#34495e',
+                'backgroundColor': '#2c3e50',
                 'color': 'white',
-                'padding': '6px 4px',
+                'padding': '6px 3px',
                 'textAlign': 'center',
                 'fontWeight': 'bold',
                 'border': '1px solid #2c3e50',
-                'minWidth': '40px',
-                'maxWidth': '50px',
+                'minWidth': '50px',
+                'maxWidth': '60px',
                 'fontSize': '11px'
             },
             title=nomes_completos[mes]
@@ -601,20 +648,21 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         
         celulas = [html.Td(
             html.Div(linha['Unidade'], style={
-                'fontSize': '10px',
+                'fontSize': '11px',
+                'fontWeight': 'bold',
                 'overflow': 'hidden',
                 'textOverflow': 'ellipsis',
-                'whiteSpace': 'nowrap'
+                'whiteSpace': 'nowrap',
+                'padding': '2px 0'
             }),
             style={
                 'backgroundColor': bg_color,
-                'padding': '6px 8px',
+                'padding': '8px 10px',
                 'textAlign': 'left',
                 'border': '1px solid #dee2e6',
-                'fontWeight': 'bold',
-                'fontSize': '10px',
-                'minWidth': '100px',
-                'maxWidth': '120px',
+                'fontSize': '11px',
+                'minWidth': '120px',
+                'maxWidth': '150px',
                 'position': 'sticky',
                 'left': '0',
                 'zIndex': '1'
@@ -622,7 +670,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         )]
         
         for mes in meses_ano:
-            conteudo = linha.get(mes, html.Div("-", style={'color': '#ccc', 'fontSize': '10px'}))
+            conteudo = linha.get(mes, html.Div("-", style={'color': '#ccc', 'fontSize': '10px', 'padding': '10px 0'}))
             celulas.append(html.Td(
                 conteudo,
                 style={
@@ -631,9 +679,9 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     'textAlign': 'center',
                     'border': '1px solid #dee2e6',
                     'verticalAlign': 'middle',
-                    'minHeight': '30px',
-                    'minWidth': '40px',
-                    'maxWidth': '50px'
+                    'minHeight': '45px',
+                    'minWidth': '50px',
+                    'maxWidth': '60px'
                 }
             ))
         
@@ -647,7 +695,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'borderCollapse': 'collapse',
         'marginTop': '5px',
         'fontFamily': 'Arial, sans-serif',
-        'fontSize': '10px',
+        'fontSize': '11px',
         'tableLayout': 'fixed'
     })
     
@@ -661,54 +709,83 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'border': '1px solid #dee2e6',
             'borderRadius': '3px',
             'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
-            'maxHeight': '500px',  # Altura máxima
-            'overflowY': 'auto'    # Rolagem vertical se necessário
+            'maxHeight': '550px',
+            'overflowY': 'auto'
         }
     )
     
-    # Legenda compacta
+    # Legenda melhorada
     legenda = html.Div([
-        html.P("Legenda:", style={'marginBottom': '5px', 'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': 'bold'}),
+        html.P("Legenda dos Relatórios:", style={'marginBottom': '5px', 'color': '#2c3e50', 'fontSize': '12px', 'fontWeight': 'bold'}),
         html.Div([
-            html.Span("•", style={
-                'color': '#c0392b',
-                'marginRight': '3px',
-                'fontWeight': 'bold',
-                'fontSize': '12px'
-            }),
-            html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '10px', 'marginRight': '10px'}),
+            html.Div([
+                html.Div("REL", style={
+                    'fontSize': '9px',
+                    'fontWeight': 'bold',
+                    'color': '#c0392b',
+                    'backgroundColor': '#fdecea',
+                    'padding': '3px 5px',
+                    'borderRadius': '2px',
+                    'border': '1px solid #c0392b',
+                    'marginRight': '5px',
+                    'minWidth': '35px',
+                    'textAlign': 'center'
+                }),
+                html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '10px'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '15px'}),
             
-            html.Span("•", style={
-                'color': '#f39c12',
-                'marginRight': '3px',
-                'fontWeight': 'bold',
-                'fontSize': '12px'
-            }),
-            html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '10px', 'marginRight': '10px'}),
+            html.Div([
+                html.Div("REL", style={
+                    'fontSize': '9px',
+                    'fontWeight': 'bold',
+                    'color': '#f39c12',
+                    'backgroundColor': '#fff8e1',
+                    'padding': '3px 5px',
+                    'borderRadius': '2px',
+                    'border': '1px solid #f39c12',
+                    'marginRight': '5px',
+                    'minWidth': '35px',
+                    'textAlign': 'center'
+                }),
+                html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '10px'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '15px'}),
             
-            html.Span("•", style={
-                'color': '#27ae60',
-                'marginRight': '3px',
-                'fontWeight': 'bold',
-                'fontSize': '12px'
-            }),
-            html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '10px', 'marginRight': '10px'}),
+            html.Div([
+                html.Div("REL", style={
+                    'fontSize': '9px',
+                    'fontWeight': 'bold',
+                    'color': '#27ae60',
+                    'backgroundColor': '#eafaf1',
+                    'padding': '3px 5px',
+                    'borderRadius': '2px',
+                    'border': '1px solid #27ae60',
+                    'marginRight': '5px',
+                    'minWidth': '35px',
+                    'textAlign': 'center'
+                }),
+                html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '10px'})
+            ], style={'display': 'flex', 'alignItems': 'center'}),
             
-            html.Span("-", style={
-                'color': '#ccc',
-                'marginRight': '3px',
-                'fontWeight': 'bold',
-                'fontSize': '12px'
-            }),
-            html.Span("Sem dados", style={'color': '#2c3e50', 'fontSize': '10px'})
-        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '8px', 'alignItems': 'center'})
+            html.Div([
+                html.Div("+2", style={
+                    'fontSize': '8px',
+                    'backgroundColor': '#e74c3c',
+                    'color': 'white',
+                    'padding': '1px 3px',
+                    'borderRadius': '2px',
+                    'marginRight': '5px',
+                    'fontWeight': 'bold'
+                }),
+                html.Span("Mais relatórios", style={'color': '#2c3e50', 'fontSize': '10px'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginLeft': '15px'})
+        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '10px', 'alignItems': 'center'})
     ], style={
         'backgroundColor': '#f8f9fa',
-        'padding': '8px 10px',
+        'padding': '10px 12px',
         'borderRadius': '3px',
-        'marginBottom': '10px',
+        'marginBottom': '12px',
         'border': '1px solid #dee2e6',
-        'fontSize': '10px'
+        'fontSize': '11px'
     })
     
     titulo_matriz = f"📋 Matriz de Risco - {ano_filtro} ({len(df_risco_filtrado)} registros)"
@@ -717,13 +794,13 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         html.H4(titulo_matriz, style={
             'marginBottom': '10px', 
             'color': '#2c3e50',
-            'fontSize': '14px',
+            'fontSize': '16px',
             'display': 'flex',
             'alignItems': 'center',
             'gap': '8px'
         }),
-        html.P(f"Passe o mouse sobre os pontos para ver detalhes", 
-               style={'color': '#7f8c8d', 'marginBottom': '5px', 'fontSize': '10px'}),
+        html.P(f"Passe o mouse sobre os códigos para ver detalhes completos", 
+               style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '11px'}),
         legenda,
         tabela_container
     ], style={
@@ -860,7 +937,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         parcial = 0
         nao = 0
 
-    # ---------- KPIs ----------
+    # ---------- KPIs GERAIS ----------
     kpis = html.Div([
         html.Div([
             html.H4("Conforme", style={'color':'#27ae60','margin':'0', 'fontSize': '14px'}),
@@ -889,6 +966,11 @@ def atualizar_conteudo_principal(ano, mes, unidade):
 
     # ---------- Tabela de NÃO CONFORMES COM COMPARAÇÃO DE PRAZOS ----------
     df_nao_conforme = df[df['Status']=='Não Conforme']
+    
+    # Inicializar contadores de prazo
+    dentro_prazo = 0
+    fora_prazo = 0
+    nao_concluido = 0
     
     if len(df_nao_conforme) > 0:
         # Fazer uma cópia para não modificar o original
@@ -934,6 +1016,17 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 lambda row: calcular_status_prazo(row[coluna_prazo], row[coluna_finalizacao]), 
                 axis=1
             )
+            
+            # Contar status dos prazos
+            status_prazos = df_nao_conforme_display['Status_Prazo'].value_counts()
+            dentro_prazo = status_prazos.get('Concluído no Prazo', 0)
+            fora_prazo = status_prazos.get('Concluído Fora do Prazo', 0)
+            nao_concluido = status_prazos.get('Não Concluído', 0)
+            
+            print(f"📊 STATUS DOS PRAZOS:")
+            print(f"  Dentro do prazo: {dentro_prazo}")
+            print(f"  Fora do prazo: {fora_prazo}")
+            print(f"  Não concluído: {nao_concluido}")
             
             # Reordenar colunas para melhor visualização
             colunas_ordenadas = ['Unidade', 'Status', 'Status_Prazo', 'Prazo_Formatado', 'Finalizacao_Formatada']
@@ -1005,19 +1098,6 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 ]
             )
             
-            # Adicionar legenda
-            legenda_prazo = html.Div([
-                html.P("📌 Legenda do Status do Prazo:", style={'fontWeight':'bold','marginBottom':'3px', 'fontSize': '11px'}),
-                html.Div([
-                    html.Span("🟢 ", style={'color':'#27ae60','marginRight':'3px', 'fontSize': '10px'}),
-                    html.Span("Concluído no Prazo", style={'marginRight':'10px','color':'#27ae60', 'fontSize': '10px'}),
-                    html.Span("🟡 ", style={'color':'#f39c12','marginRight':'3px', 'fontSize': '10px'}),
-                    html.Span("Não Concluído", style={'marginRight':'10px','color':'#f39c12', 'fontSize': '10px'}),
-                    html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'3px', 'fontSize': '10px'}),
-                    html.Span("Concluído Fora do Prazo", style={'color':'#e74c3c', 'fontSize': '10px'})
-                ], style={'backgroundColor':'#f8f9fa','padding':'6px 8px','borderRadius':'3px','marginBottom':'8px', 'fontSize': '10px'})
-            ], style={'marginBottom':'15px'})
-            
         else:
             # Se não encontrou as colunas, mostrar tabela normal
             print(f"⚠️ Não encontrou colunas de prazo/finalização. Colunas disponíveis: {colunas_disponiveis}")
@@ -1062,16 +1142,63 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'}
                 ]
             )
-            legenda_prazo = html.Div()
     else:
         tabela_nao_conforme = html.Div([
             html.P("✅ Nenhum item não conforme encontrado com os filtros atuais.", 
                    style={'textAlign': 'center', 'padding': '15px', 'color': '#27ae60', 'fontSize': '12px'})
         ])
-        legenda_prazo = html.Div()
     
     tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)", 
                            style={'marginTop': '25px', 'marginBottom': '10px', 'color': '#c0392b', 'fontSize': '16px'})
+    
+    # ---------- KPIs de PRAZOS dos Itens Não Conformes ----------
+    if len(df_nao_conforme) > 0 and (coluna_prazo and coluna_finalizacao):
+        kpis_prazos = html.Div([
+            html.Div([
+                html.H4("Dentro do Prazo", style={'color':'#27ae60','margin':'0', 'fontSize': '12px'}),
+                html.H2(f"{dentro_prazo}", style={'color':'#27ae60','margin':'0', 'fontSize': '24px'}),
+                html.P(f"{(dentro_prazo/len(df_nao_conforme)*100 if len(df_nao_conforme)>0 else 0):.1f}%", 
+                       style={'margin':'0','color':'#27ae60', 'fontSize': '10px'})
+            ], style={'borderLeft':'4px solid #27ae60','borderRadius':'4px','padding':'10px','margin':'5px','flex':'1',
+                      'backgroundColor':'#d4edda','textAlign':'center','boxShadow':'1px 1px 3px rgba(0,0,0,0.1)',
+                      'minWidth': '120px', 'maxWidth': '140px'}),
+
+            html.Div([
+                html.H4("Fora do Prazo", style={'color':'#e74c3c','margin':'0', 'fontSize': '12px'}),
+                html.H2(f"{fora_prazo}", style={'color':'#e74c3c','margin':'0', 'fontSize': '24px'}),
+                html.P(f"{(fora_prazo/len(df_nao_conforme)*100 if len(df_nao_conforme)>0 else 0):.1f}%", 
+                       style={'margin':'0','color':'#e74c3c', 'fontSize': '10px'})
+            ], style={'borderLeft':'4px solid #e74c3c','borderRadius':'4px','padding':'10px','margin':'5px','flex':'1',
+                      'backgroundColor':'#f8d7da','textAlign':'center','boxShadow':'1px 1px 3px rgba(0,0,0,0.1)',
+                      'minWidth': '120px', 'maxWidth': '140px'}),
+
+            html.Div([
+                html.H4("Não Concluídos", style={'color':'#f39c12','margin':'0', 'fontSize': '12px'}),
+                html.H2(f"{nao_concluido}", style={'color':'#f39c12','margin':'0', 'fontSize': '24px'}),
+                html.P(f"{(nao_concluido/len(df_nao_conforme)*100 if len(df_nao_conforme)>0 else 0):.1f}%", 
+                       style={'margin':'0','color':'#f39c12', 'fontSize': '10px'})
+            ], style={'borderLeft':'4px solid #f39c12','borderRadius':'4px','padding':'10px','margin':'5px','flex':'1',
+                      'backgroundColor':'#fff3cd','textAlign':'center','boxShadow':'1px 1px 3px rgba(0,0,0,0.1)',
+                      'minWidth': '120px', 'maxWidth': '140px'})
+        ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'15px', 'gap': '5px'})
+        
+        # Adicionar legenda para KPIs de prazo
+        legenda_prazo = html.Div([
+            html.P("📊 Status dos Prazos dos Itens Não Conformes:", 
+                   style={'fontWeight':'bold','marginBottom':'3px', 'fontSize': '11px', 'textAlign': 'center'}),
+            html.Div([
+                html.Span("🟢 ", style={'color':'#27ae60','marginRight':'3px', 'fontSize': '10px'}),
+                html.Span("Dentro do Prazo", style={'marginRight':'10px','color':'#27ae60', 'fontSize': '10px'}),
+                html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'3px', 'fontSize': '10px'}),
+                html.Span("Fora do Prazo", style={'marginRight':'10px','color':'#e74c3c', 'fontSize': '10px'}),
+                html.Span("🟡 ", style={'color':'#f39c12','marginRight':'3px', 'fontSize': '10px'}),
+                html.Span("Não Concluído", style={'color':'#f39c12', 'fontSize': '10px'})
+            ], style={'backgroundColor':'#f8f9fa','padding':'6px 8px','borderRadius':'3px','marginBottom':'8px', 
+                      'fontSize': '10px', 'textAlign': 'center'})
+        ], style={'marginBottom':'15px', 'textAlign': 'center'})
+    else:
+        kpis_prazos = html.Div()
+        legenda_prazo = html.Div()
 
     # ---------- Matriz de Risco (APENAS ANO) ----------
     abas_extra = []
@@ -1227,6 +1354,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         ]),
         kpis,
         tabela_titulo,
+        # KPIs de PRAZOS dos Itens Não Conformes
+        kpis_prazos,
         legenda_prazo,
         tabela_nao_conforme,
         *abas_extra
@@ -1236,9 +1365,9 @@ def atualizar_conteudo_principal(ano, mes, unidade):
 if __name__ == '__main__':
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
     print("📊 DASHBOARD OTIMIZADO:")
-    print("  - ✅ Gráfico de pizza REMOVIDO (já temos KPIs)")
-    print("  - ✅ Matriz de risco COMPACTA (cabe na tela)")
-    print("  - ✅ Fontes menores para melhor visualização")
+    print("  - ✅ Gráfico de pizza REMOVIDO")
+    print("  - ✅ KPIs de PRAZOS para itens não conformes")
+    print("  - ✅ Matriz de risco COM NOMES VISÍVEIS")
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
