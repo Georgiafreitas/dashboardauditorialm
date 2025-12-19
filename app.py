@@ -232,57 +232,43 @@ def carregar_dados_da_planilha():
                     if 'Status' in df.columns:
                         df['Status'] = df['Status'].apply(canonical_status)
                     
-                    # Processar datas para a matriz - VERSÃO CORRIGIDA
+                    # CORREÇÃO: Processar datas para a matriz CORRETAMENTE
                     if 'Data' in df.columns:
                         print(f"  🔍 Processando datas de RISCO...")
-                        print(f"  Amostra de datas brutas: {df['Data'].head(10).tolist()}")
                         
-                        # Converter para datetime com tratamento robusto
+                        # Primeiro, mostrar amostra das datas
+                        print(f"  Amostra de 10 datas brutas:")
+                        for j, data in enumerate(df['Data'].head(10).tolist()):
+                            print(f"    {j+1:2d}. '{data}'")
+                        
+                        # Converter datas para datetime CORRETAMENTE
+                        # O formato está claramente dd/mm/aaaa (01/06/2025, 01/07/2025, etc.)
                         df['Data_DT'] = pd.to_datetime(
                             df['Data'], 
-                            errors='coerce', 
-                            dayfirst=True,  # Formato brasileiro dd/mm/aaaa
-                            exact=False     # Mais flexível
+                            format='%d/%m/%Y',  # Formato específico dd/mm/aaaa
+                            errors='coerce',
+                            dayfirst=True  # Garantir formato brasileiro
                         )
                         
-                        # DEBUG: Verificar resultados da conversão
-                        total_dates = len(df['Data'])
-                        success_dates = df['Data_DT'].notna().sum()
-                        failed_dates = total_dates - success_dates
+                        # Verificar se a conversão funcionou
+                        total = len(df)
+                        sucesso = df['Data_DT'].notna().sum()
+                        falhas = total - sucesso
                         
-                        print(f"  Total de datas: {total_dates}")
-                        print(f"  Conversões bem-sucedidas: {success_dates}")
-                        print(f"  Conversões falhadas: {failed_dates}")
+                        print(f"  ✅ Conversão de datas:")
+                        print(f"     Total: {total}")
+                        print(f"     Conversões bem-sucedidas: {sucesso} ({sucesso/total*100:.1f}%)")
+                        print(f"     Falhas: {falhas}")
                         
-                        if failed_dates > 0:
-                            # Mostrar exemplos de datas que falharam
-                            failed_samples = df[df['Data_DT'].isna()]['Data'].head(5).tolist()
-                            print(f"  ⚠️ Exemplos de datas que falharam: {failed_samples}")
+                        if falhas > 0:
+                            print(f"  ⚠️ Datas que falharam na conversão:")
+                            falhas_df = df[df['Data_DT'].isna()]
+                            for j, data in enumerate(falhas_df['Data'].head(5).tolist()):
+                                print(f"      {j+1}. '{data}'")
                         
-                        # Criar colunas de mês e ano a partir da data convertida
+                        # Extrair mês e ano da data convertida
                         df['Mes'] = df['Data_DT'].dt.month
                         df['Ano'] = df['Data_DT'].dt.year
-                        
-                        # Para datas que não puderam ser convertidas, tentar extrair de outras formas
-                        if failed_dates > 0:
-                            # Tentar extrair mês e ano do texto da data
-                            for idx in df[df['Data_DT'].isna()].index:
-                                data_str = str(df.at[idx, 'Data'])
-                                if data_str and data_str != 'nan' and data_str != 'NaT':
-                                    # Tentar encontrar padrões de data no texto
-                                    # Padrão dd/mm/aaaa ou dd-mm-aaaa
-                                    padrao_data = r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})'
-                                    match = re.search(padrao_data, data_str)
-                                    if match:
-                                        dia, mes, ano = match.groups()
-                                        try:
-                                            mes_int = int(mes)
-                                            ano_int = int(ano) if len(ano) == 4 else 2000 + int(ano)
-                                            df.at[idx, 'Mes'] = mes_int
-                                            df.at[idx, 'Ano'] = ano_int
-                                            print(f"    ✓ Extraído: {data_str} -> Mês: {mes_int}, Ano: {ano_int}")
-                                        except:
-                                            pass
                         
                         # Converter para inteiros
                         df['Mes'] = df['Mes'].fillna(0).astype(int)
@@ -290,21 +276,30 @@ def carregar_dados_da_planilha():
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         
-                        # DEBUG: Mostrar distribuição de anos e meses
-                        print(f"  📅 DISTRIBUIÇÃO ANOS (RISCO):")
-                        if 'Ano' in df.columns:
-                            anos_dist = df['Ano'].value_counts().sort_index()
-                            for ano, contagem in anos_dist.items():
-                                print(f"     Ano {ano}: {contagem} registros")
+                        # Criar Mes_Ano para agrupamento - CORREÇÃO CRÍTICA AQUI
+                        df['Mes_Ano'] = df.apply(
+                            lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
+                            if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
+                            else "",  # Deixar vazio se não tiver data
+                            axis=1
+                        )
                         
-                        print(f"  📅 DISTRIBUIÇÃO MESES (RISCO):")
-                        if 'Mes' in df.columns:
-                            meses_dist = df['Mes'].value_counts().sort_index()
-                            for mes_val, contagem in meses_dist.items():
-                                print(f"     Mês {mes_val}: {contagem} registros")
+                        # Remover linhas sem data
+                        linhas_sem_data = df['Mes_Ano'].isin(['', '00/0', '0/0', '00/0000']).sum()
+                        if linhas_sem_data > 0:
+                            print(f"  ⚠️ {linhas_sem_data} linhas sem data válida serão removidas")
+                            df = df[~df['Mes_Ano'].isin(['', '00/0', '0/0', '00/0000'])]
+                        
+                        # DEBUG: Mostrar distribuição
+                        print(f"  📊 DISTRIBUIÇÃO DE MES_ANO:")
+                        distribuicao = df['Mes_Ano'].value_counts().sort_index()
+                        for mes_ano, contagem in distribuicao.items():
+                            print(f"     {mes_ano}: {contagem} registros")
+                        
+                        print(f"  Valores únicos de Mes_Ano: {sorted(df['Mes_Ano'].unique())}")
                         
                         # Formatar data para exibição
-                        df['Data'] = df['Data_DT'].apply(
+                        df['Data_Formatada'] = df['Data_DT'].apply(
                             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
                         )
                         
@@ -375,38 +370,43 @@ if df_checklist is None:
         app.run(debug=True, port=8050)
     exit()
 
-# Verificação adicional da matriz de risco
-print("="*50)
-print("VERIFICAÇÃO MATRIZ DE RISCO:")
-print("="*50)
+# VERIFICAÇÃO DETALHADA DA MATRIZ DE RISCO
+print("\n" + "="*60)
+print("VERIFICAÇÃO DETALHADA - MATRIZ DE RISCO")
+print("="*60)
 
 if df_risco is not None:
     print(f"Total de registros: {len(df_risco)}")
     print(f"Colunas disponíveis: {df_risco.columns.tolist()}")
     
+    # Verificar valores únicos na coluna Data
     if 'Data' in df_risco.columns:
-        print(f"\n📅 10 primeiras datas na matriz de risco:")
-        print(df_risco['Data'].head(10).tolist())
+        print(f"\n📅 Valores únicos na coluna 'Data' (todos):")
+        valores_unicos = df_risco['Data'].dropna().unique()
+        print(f"Total de valores únicos: {len(valores_unicos)}")
+        for i, valor in enumerate(valores_unicos[:30]):  # Mostrar até 30
+            print(f"  {i+1:2d}. '{valor}'")
     
-    if 'Mes' in df_risco.columns and 'Ano' in df_risco.columns:
-        print(f"\n📊 Combinações únicas de Mês/Ano:")
-        combinacoes = df_risco[['Mes', 'Ano']].drop_duplicates()
-        print(combinacoes.head(20))
-        
-        # Criar Mes_Ano para verificação
-        if 'Mes_Ano' not in df_risco.columns:
-            df_risco['Mes_Ano'] = df_risco.apply(
-                lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
-                if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
-                else "Sem Data", 
-                axis=1
-            )
-        
-        print(f"\n📈 Valores únicos de Mes_Ano:")
-        print(df_risco['Mes_Ano'].value_counts().sort_index())
+    # Verificar coluna Mes_Ano
+    if 'Mes_Ano' in df_risco.columns:
+        print(f"\n📊 Valores únicos na coluna 'Mes_Ano':")
+        valores_mes_ano = df_risco['Mes_Ano'].dropna().unique()
+        for valor in sorted(valores_mes_ano):
+            contagem = len(df_risco[df_risco['Mes_Ano'] == valor])
+            print(f"  {valor}: {contagem} registros")
+    
+    # Verificar outras colunas que podem conter data
+    for col in df_risco.columns:
+        col_lower = str(col).lower()
+        if any(termo in col_lower for termo in ['mes', 'ano', 'periodo', 'data']):
+            if col not in ['Data', 'Mes', 'Ano', 'Mes_Ano']:
+                print(f"\n🔍 Coluna '{col}' (valores únicos):")
+                valores = df_risco[col].dropna().unique()[:10]
+                for i, valor in enumerate(valores):
+                    print(f"  {i+1}. '{valor}'")
 
 anos_disponiveis = obter_anos_disponiveis(df_checklist)
-print(f"DEBUG: Anos disponíveis no filtro: {anos_disponiveis}")
+print(f"\nDEBUG: Anos disponíveis no filtro: {anos_disponiveis}")
 
 # ========== APP DASH ==========
 app = Dash(__name__)
@@ -469,7 +469,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     df = df_checklist.copy()
     
     # CORREÇÃO CRÍTICA: Converter colunas para tipos consistentes antes de filtrar
-    print(f"🔍 DEBUG FILTROS: Ano='{ano}', Mês='{mes}', Unidade='{unidade}'")
+    print(f"\n🔍 DEBUG FILTROS: Ano='{ano}', Mês='{mes}', Unidade='{unidade}'")
     
     # Converter colunas numéricas para o tipo correto
     if 'Ano' in df.columns:
@@ -779,56 +779,90 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     if df_risco is not None and len(df_risco) > 0:
         df_risco_filtrado = df_risco.copy()
         
-        # CORREÇÃO: Converter colunas Ano e Mes para numérico
+        print(f"\n📋 MATRIZ DE RISCO - FILTRAGEM:")
+        print(f"  Filtros aplicados: Ano={ano}, Mês={mes}, Unidade={unidade}")
+        print(f"  Total de registros antes dos filtros: {len(df_risco_filtrado)}")
+        
+        # CORREÇÃO: Converter colunas Ano e Mes para numérico se existirem
         if 'Ano' in df_risco_filtrado.columns:
             df_risco_filtrado['Ano'] = pd.to_numeric(df_risco_filtrado['Ano'], errors='coerce')
+            print(f"  Coluna 'Ano' convertida para numérico")
+        
         if 'Mes' in df_risco_filtrado.columns:
             df_risco_filtrado['Mes'] = pd.to_numeric(df_risco_filtrado['Mes'], errors='coerce')
+            print(f"  Coluna 'Mes' convertida para numérico")
         
-        # Aplicar filtros
-        if ano != 'todos' and 'Ano' in df_risco_filtrado.columns:
-            try:
-                ano_int = int(ano)
-                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
-                print(f"  ✅ Matriz - Filtro ANO aplicado: {ano_int}")
-            except:
-                print(f"  ⚠️ Erro ao filtrar matriz por ano: {ano}")
+        # Aplicar filtros - CORREÇÃO: Verificar se as colunas existem
+        if ano != 'todos':
+            if 'Ano' in df_risco_filtrado.columns:
+                try:
+                    ano_int = int(ano)
+                    antes = len(df_risco_filtrado)
+                    df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
+                    print(f"  ✅ Matriz - Filtro ANO aplicado: {ano_int}")
+                    print(f"     Registros antes: {antes}, depois: {len(df_risco_filtrado)}")
+                except Exception as e:
+                    print(f"  ⚠️ Erro ao filtrar matriz por ano '{ano}': {e}")
+            else:
+                print(f"  ⚠️ Coluna 'Ano' não encontrada na matriz")
         
-        if mes != 'todos' and 'Mes' in df_risco_filtrado.columns:
-            try:
-                mes_int = int(mes)
-                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == mes_int]
-                print(f"  ✅ Matriz - Filtro MÊS aplicado: {mes_int}")
-            except:
-                print(f"  ⚠️ Erro ao filtrar matriz por mês: {mes}")
+        if mes != 'todos':
+            if 'Mes' in df_risco_filtrado.columns:
+                try:
+                    mes_int = int(mes)
+                    antes = len(df_risco_filtrado)
+                    df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == mes_int]
+                    print(f"  ✅ Matriz - Filtro MÊS aplicado: {mes_int}")
+                    print(f"     Registros antes: {antes}, depois: {len(df_risco_filtrado)}")
+                except Exception as e:
+                    print(f"  ⚠️ Erro ao filtrar matriz por mês '{mes}': {e}")
+            else:
+                print(f"  ⚠️ Coluna 'Mes' não encontrada na matriz")
         
-        if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
-            df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
-            print(f"  ✅ Matriz - Filtro UNIDADE aplicado: '{unidade}'")
+        if unidade != 'todas':
+            if 'Unidade' in df_risco_filtrado.columns:
+                antes = len(df_risco_filtrado)
+                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
+                print(f"  ✅ Matriz - Filtro UNIDADE aplicado: '{unidade}'")
+                print(f"     Registros antes: {antes}, depois: {len(df_risco_filtrado)}")
+            else:
+                print(f"  ⚠️ Coluna 'Unidade' não encontrada na matriz")
 
         # CORREÇÃO: Criar Mes_Ano de forma robusta - VERIFICAR SE TEM DADOS
-        print(f"📋 Matriz: {len(df_risco_filtrado)} registros após filtros")
+        print(f"\n📋 Matriz após filtros: {len(df_risco_filtrado)} registros")
         
         if len(df_risco_filtrado) > 0:
-            # Garantir que temos Ano e Mes
-            if 'Ano' not in df_risco_filtrado.columns or 'Mes' not in df_risco_filtrado.columns:
-                print("⚠️ Matriz: Colunas Ano ou Mes não encontradas")
-            
-            # Criar Mes_Ano se não existir
+            # Garantir que temos coluna Mes_Ano
             if 'Mes_Ano' not in df_risco_filtrado.columns:
-                df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
-                    lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
-                    if pd.notna(row['Mes']) and pd.notna(row['Ano']) and row['Mes'] != 0 and row['Ano'] != 0
-                    else "Sem Data", 
-                    axis=1
-                )
+                print("⚠️ Matriz: Coluna Mes_Ano não encontrada, criando...")
+                # Tentar criar a partir de Mes e Ano
+                if 'Mes' in df_risco_filtrado.columns and 'Ano' in df_risco_filtrado.columns:
+                    df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
+                        lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
+                        if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
+                        else "", 
+                        axis=1
+                    )
+                else:
+                    # Se não tem Mes e Ano, criar coluna padrão
+                    df_risco_filtrado['Mes_Ano'] = "Sem Data"
             
             # Agrupar dados por Unidade e Mes_Ano
             unidades = sorted(df_risco_filtrado['Unidade'].dropna().unique())
             meses_anos = sorted(df_risco_filtrado['Mes_Ano'].dropna().unique())
             
-            print(f"📊 Matriz: {len(unidades)} unidades, {len(meses_anos)} meses_anos")
-            print(f"📅 Meses_Anos: {meses_anos}")
+            print(f"📊 Matriz: {len(unidades)} unidades, {len(meses_anos)} meses/anos")
+            print(f"📅 Meses/Anos encontrados: {meses_anos}")
+            
+            # Se só tiver um mês/ano, verificar se precisa criar mais colunas
+            if len(meses_anos) <= 1:
+                print(f"⚠️ Apenas {len(meses_anos)} mês/ano encontrado. Verificando datas originais...")
+                if 'Data' in df_risco_filtrado.columns:
+                    # Extrair mês/ano das datas originais
+                    print("  Datas originais únicas:")
+                    datas_unicas = df_risco_filtrado['Data'].dropna().unique()[:10]
+                    for data in datas_unicas:
+                        print(f"    '{data}'")
             
             # Criar estrutura de dados para a matriz
             matriz_data = []
@@ -838,7 +872,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
                 
                 for mes_ano in meses_anos:
-                    if pd.isna(mes_ano) or mes_ano == "Sem Data":
+                    if pd.isna(mes_ano) or mes_ano == "Sem Data" or mes_ano == "":
                         continue
                     
                     df_mes = df_unidade[df_unidade['Mes_Ano'] == mes_ano]
@@ -847,8 +881,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                         # Criar lista de relatórios com cores
                         relatorios_html = []
                         for _, row in df_mes.iterrows():
-                            relatorio = str(row['Relatorio']) if 'Relatorio' in row else "Sem Relatório"
-                            status = str(row['Status']) if 'Status' in row else "Sem Status"
+                            relatorio = str(row['Relatorio']) if 'Relatorio' in row and pd.notna(row['Relatorio']) else "Sem Relatório"
+                            status = str(row['Status']) if 'Status' in row and pd.notna(row['Status']) else "Sem Status"
                             cores = get_status_color(status)
                             
                             relatorio_item = html.Span(
@@ -902,7 +936,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             })]
             
             for mes_ano in meses_anos:
-                if pd.isna(mes_ano) or mes_ano == "Sem Data":
+                if pd.isna(mes_ano) or mes_ano in ["Sem Data", ""]:
                     continue
                 tabela_cabecalho.append(html.Th(str(mes_ano), style={
                     'backgroundColor': '#34495e',
@@ -931,7 +965,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 })]
                 
                 for mes_ano in meses_anos:
-                    if pd.isna(mes_ano) or mes_ano == "Sem Data":
+                    if pd.isna(mes_ano) or mes_ano in ["Sem Data", ""]:
                         continue
                     
                     conteudo = linha.get(mes_ano, "")
@@ -1004,6 +1038,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             abas_extra.append(html.Div([
                 html.H3("📋 Matriz Auditoria Risco", style={'marginBottom': '20px'}),
                 html.P(f"Total de registros: {len(df_risco_filtrado)} | Período: {ano if ano != 'todos' else 'Todos'} {f'Mês: {mes}' if mes != 'todos' else ''}", 
+                       style={'color': '#7f8c8d', 'marginBottom': '10px'}),
+                html.P(f"Unidades: {len(unidades)} | Períodos: {len(meses_anos)}", 
                        style={'color': '#7f8c8d', 'marginBottom': '10px'}),
                 legenda,
                 tabela_container
@@ -1112,4 +1148,7 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+# ========== SERVER PARA O RENDER ==========
+server = app.server
+
 
