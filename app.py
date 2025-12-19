@@ -129,41 +129,6 @@ def formatar_data(data_str):
         print(f"Erro ao formatar data '{data_str}': {e}")
         return str(data_str)
 
-def extrair_mes_ano_da_data(data_str):
-    """Extrai mês e ano de uma string de data"""
-    if pd.isna(data_str) or str(data_str) in ['', 'nan', 'NaT', 'None']:
-        return None, None
-    
-    try:
-        # Converter para datetime
-        data_dt = pd.to_datetime(data_str, dayfirst=True, errors='coerce')
-        if pd.notna(data_dt):
-            return data_dt.month, data_dt.year
-        
-        # Tentar padrões comuns
-        data_str_clean = str(data_str).strip()
-        
-        # Padrão dd/mm/aaaa
-        match = re.match(r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})', data_str_clean)
-        if match:
-            dia, mes, ano = match.groups()
-            mes = int(mes)
-            ano = int(ano) if len(ano) == 4 else 2000 + int(ano)
-            return mes, ano
-        
-        # Padrão mm/aaaa
-        match = re.match(r'(\d{1,2})[/-](\d{2,4})', data_str_clean)
-        if match:
-            mes, ano = match.groups()
-            mes = int(mes)
-            ano = int(ano) if len(ano) == 4 else 2000 + int(ano)
-            return mes, ano
-        
-    except Exception as e:
-        print(f"Erro ao extrair mês/ano de '{data_str}': {e}")
-    
-    return None, None
-
 def carregar_dados_da_planilha():
     planilha_path = 'base_auditoria.xlsx'
     if not os.path.exists(planilha_path):
@@ -173,15 +138,18 @@ def carregar_dados_da_planilha():
     try:
         print(f"📁 Carregando dados da planilha: {planilha_path}")
 
-        # Leitura das planilhas - SEM dtype=str para permitir conversão correta
-        df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', 
-                                     engine='openpyxl')
-        df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', 
-                                     engine='openpyxl')
-        df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco', 
-                                 engine='openpyxl')
-        df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica', 
-                                     engine='openpyxl')
+        # Leitura das planilhas - IMPORTANTE: Não usar dtype=str para permitir conversão de tipos
+        print("  Lendo aba Checklist_Unidades...")
+        df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', engine='openpyxl')
+        
+        print("  Lendo aba Politicas...")
+        df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', engine='openpyxl')
+        
+        print("  Lendo aba Auditoria_Risco...")
+        df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco', engine='openpyxl')
+        
+        print("  Lendo aba Melhorias_Logistica...")
+        df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica', engine='openpyxl')
 
         print("✅ Leitura inicial da planilha concluída. Processando dados...")
 
@@ -190,6 +158,7 @@ def carregar_dados_da_planilha():
                 print(f"\n{'='*50}")
                 print(f"Processando aba {i}:")
                 print(f"Colunas originais: {df.columns.tolist()}")
+                print(f"Total de registros: {len(df)}")
                 
                 df = normalize_df_columns(df)
                 print(f"Colunas após normalização: {df.columns.tolist()}")
@@ -208,6 +177,8 @@ def carregar_dados_da_planilha():
                     # Processar datas
                     if 'Data' in df.columns:
                         print(f"  Processando coluna Data...")
+                        print(f"  Tipo da coluna Data: {df['Data'].dtype}")
+                        print(f"  Amostra de datas: {df['Data'].head(5).tolist()}")
                         
                         # Converter a coluna Data para datetime
                         df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
@@ -225,7 +196,6 @@ def carregar_dados_da_planilha():
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         
-                        print(f"  Total de registros: {len(df)}")
                         print(f"  Ano únicos: {df['Ano'].dropna().unique()}")
                         print(f"  Mês únicos: {df['Mes'].dropna().unique()}")
                         
@@ -243,13 +213,6 @@ def carregar_dados_da_planilha():
                 elif i == 2:  # df_risco - CORREÇÃO COMPLETA AQUI
                     print("🔄 Processando dados de RISCO...")
                     print(f"  🔍 Colunas disponíveis: {df.columns.tolist()}")
-                    print(f"  📊 Total de registros: {len(df)}")
-                    
-                    # Verificar uma amostra dos dados
-                    if len(df) > 0:
-                        print(f"  📋 Amostra dos dados (primeiras 3 linhas):")
-                        for j in range(min(3, len(df))):
-                            print(f"    Linha {j+1}: {df.iloc[j].to_dict()}")
                     
                     # 1. Encontrar e processar coluna de Status
                     coluna_status = None
@@ -260,7 +223,6 @@ def carregar_dados_da_planilha():
                     
                     if coluna_status:
                         print(f"  ✅ Coluna de Status encontrada: '{coluna_status}'")
-                        # Converter para string antes de processar
                         df[coluna_status] = df[coluna_status].astype(str).str.strip()
                         df['Status'] = df[coluna_status].apply(canonical_status)
                         print(f"  Status únicos: {df['Status'].unique()[:10]}")
@@ -277,53 +239,108 @@ def carregar_dados_da_planilha():
                     
                     if coluna_data:
                         print(f"\n  ✅ Coluna de Data encontrada: '{coluna_data}'")
+                        print(f"  Tipo da coluna Data: {df[coluna_data].dtype}")
                         print(f"  Amostra de 10 datas brutas:")
                         datas_amostra = df[coluna_data].head(10).tolist()
                         for j, data in enumerate(datas_amostra):
                             print(f"    {j+1:2d}. '{data}' (tipo: {type(data)})")
                         
-                        # Tentar extrair mês e ano diretamente
-                        print(f"\n  🔍 Extraindo mês e ano das datas...")
+                        # CORREÇÃO: Converter datas para datetime de forma mais agressiva
+                        print(f"\n  🔍 Convertendo datas para datetime...")
                         
-                        # Criar listas para mês e ano
-                        meses = []
-                        anos = []
+                        # Primeiro, converter tudo para string para análise
+                        df['Data_Str'] = df[coluna_data].astype(str)
                         
-                        for idx, data_val in df[coluna_data].items():
-                            if pd.isna(data_val):
-                                meses.append(pd.NA)
-                                anos.append(pd.NA)
-                                continue
+                        # Tentar extrair datas de diferentes formatos
+                        def converter_data_agressiva(data_str):
+                            if pd.isna(data_str) or data_str in ['nan', 'NaT', 'None', '']:
+                                return pd.NaT
                             
-                            mes, ano = extrair_mes_ano_da_data(str(data_val))
-                            if mes and ano:
-                                meses.append(mes)
-                                anos.append(ano)
-                            else:
-                                # Tentar converter para datetime
-                                try:
-                                    data_dt = pd.to_datetime(data_val, dayfirst=True, errors='coerce')
-                                    if pd.notna(data_dt):
-                                        meses.append(data_dt.month)
-                                        anos.append(data_dt.year)
-                                    else:
-                                        meses.append(pd.NA)
-                                        anos.append(pd.NA)
-                                except:
-                                    meses.append(pd.NA)
-                                    anos.append(pd.NA)
+                            # Remover espaços extras
+                            data_str = str(data_str).strip()
+                            
+                            # Padrões comuns
+                            padroes = [
+                                # dd/mm/aaaa
+                                r'(\d{1,2})/(\d{1,2})/(\d{4})',
+                                # dd-mm-aaaa
+                                r'(\d{1,2})-(\d{1,2})-(\d{4})',
+                                # dd.mm.aaaa
+                                r'(\d{1,2})\.(\d{1,2})\.(\d{4})',
+                                # aaaa-mm-dd (formato ISO)
+                                r'(\d{4})-(\d{1,2})-(\d{1,2})',
+                            ]
+                            
+                            for padrao in padroes:
+                                match = re.search(padrao, data_str)
+                                if match:
+                                    grupos = match.groups()
+                                    if len(grupos) == 3:
+                                        try:
+                                            # Formato dd/mm/aaaa ou dd-mm-aaaa
+                                            if '/' in data_str or '-' in data_str:
+                                                if int(grupos[0]) <= 31:  # Provavelmente dd/mm/aaaa
+                                                    dia, mes, ano = grupos
+                                                    # Garantir que temos números
+                                                    dia = int(dia)
+                                                    mes = int(mes)
+                                                    ano = int(ano)
+                                                    return pd.Timestamp(year=ano, month=mes, day=dia)
+                                                else:  # Provavelmente aaaa-mm-dd
+                                                    ano, mes, dia = grupos
+                                                    dia = int(dia)
+                                                    mes = int(mes)
+                                                    ano = int(ano)
+                                                    return pd.Timestamp(year=ano, month=mes, day=dia)
+                                        except:
+                                            continue
+                            
+                            # Se não encontrou padrão, tentar pandas diretamente
+                            try:
+                                # Primeiro formato brasileiro
+                                data_dt = pd.to_datetime(data_str, dayfirst=True, errors='coerce')
+                                if pd.notna(data_dt):
+                                    return data_dt
+                                
+                                # Tentar formato americano
+                                data_dt = pd.to_datetime(data_str, dayfirst=False, errors='coerce')
+                                if pd.notna(data_dt):
+                                    return data_dt
+                                
+                                # Tentar qualquer formato
+                                data_dt = pd.to_datetime(data_str, errors='coerce')
+                                return data_dt
+                            except:
+                                return pd.NaT
                         
-                        df['Mes'] = meses
-                        df['Ano'] = anos
+                        # Aplicar conversão agressiva
+                        df['Data_DT'] = df['Data_Str'].apply(converter_data_agressiva)
                         
-                        # Contar sucessos
-                        sucesso_mes = sum(1 for m in meses if pd.notna(m))
-                        sucesso_ano = sum(1 for a in anos if pd.notna(a))
+                        # Verificar resultados
                         total = len(df)
+                        sucesso = df['Data_DT'].notna().sum()
+                        falhas = total - sucesso
                         
-                        print(f"  ✅ Extração de mês/ano:")
-                        print(f"     Mês extraído: {sucesso_mes}/{total} ({sucesso_mes/total*100:.1f}%)")
-                        print(f"     Ano extraído: {sucesso_ano}/{total} ({sucesso_ano/total*100:.1f}%)")
+                        print(f"\n  ✅ Resultado da conversão:")
+                        print(f"     Total de registros: {total}")
+                        print(f"     Conversões bem-sucedidas: {sucesso} ({sucesso/total*100:.1f}%)")
+                        print(f"     Falhas: {falhas}")
+                        
+                        if falhas > 0:
+                            print(f"  ⚠️ Exemplos de datas que falharam:")
+                            falhas_df = df[df['Data_DT'].isna()]
+                            for j, data in enumerate(falhas_df['Data_Str'].head(5).tolist()):
+                                print(f"      {j+1}. '{data}'")
+                        
+                        # Extrair mês e ano
+                        df['Mes'] = df['Data_DT'].dt.month
+                        df['Ano'] = df['Data_DT'].dt.year
+                        
+                        # Converter para inteiros
+                        df['Mes'] = df['Mes'].fillna(0).astype(int)
+                        df['Ano'] = df['Ano'].fillna(0).astype(int)
+                        df['Mes'] = df['Mes'].replace(0, pd.NA)
+                        df['Ano'] = df['Ano'].replace(0, pd.NA)
                         
                         # Criar Mes_Ano
                         df['Mes_Ano'] = df.apply(
@@ -339,8 +356,13 @@ def carregar_dados_da_planilha():
                         for mes_ano, contagem in distribuicao.items():
                             print(f"     {mes_ano}: {contagem} registros")
                         
-                        # Formatar data original para exibição
-                        df['Data_Formatada'] = df[coluna_data].apply(formatar_data)
+                        # Formatar data para exibição
+                        df['Data_Formatada'] = df['Data_DT'].apply(
+                            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
+                        )
+                        
+                        # Remover colunas temporárias
+                        df = df.drop(columns=['Data_DT', 'Data_Str'])
                     else:
                         print(f"  ❌ Coluna de Data não encontrada!")
                         df['Mes'] = pd.NA
@@ -399,7 +421,11 @@ def carregar_dados_da_planilha():
             print(f"\n📋 DETALHES DA MATRIZ DE RISCO:")
             print(f"  Colunas: {df_risco.columns.tolist()}")
             if 'Mes_Ano' in df_risco.columns:
-                print(f"  Períodos únicos encontrados: {sorted(df_risco['Mes_Ano'].dropna().unique())}")
+                periodos_unicos = df_risco['Mes_Ano'].dropna().unique()
+                print(f"  Períodos únicos encontrados ({len(periodos_unicos)}):")
+                for periodo in sorted(periodos_unicos):
+                    contagem = len(df_risco[df_risco['Mes_Ano'] == periodo])
+                    print(f"    {periodo}: {contagem} registros")
         
         return df_checklist, df_politicas, df_risco, df_melhorias
 
@@ -692,16 +718,19 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             unidades = sorted(df_risco_filtrado['Unidade'].dropna().unique())
             meses_anos = sorted(df_risco_filtrado['Mes_Ano'].dropna().unique())
             
-            print(f"  📊 Unidades encontradas: {len(unidades)} - {unidades}")
-            print(f"  📅 Períodos encontrados: {len(meses_anos)} - {meses_anos}")
+            print(f"  📊 Unidades encontradas: {len(unidades)}")
+            print(f"  📅 Períodos encontrados: {len(meses_anos)}")
+            print(f"  Períodos: {meses_anos}")
             
-            # Se não tiver períodos válidos, adicionar mensagem de erro
-            if len(meses_anos) == 0 or (len(meses_anos) == 1 and meses_anos[0] == "Sem Data"):
+            # Filtrar apenas períodos válidos (não "Sem Data")
+            meses_anos_validos = [ma for ma in meses_anos if ma != "Sem Data" and pd.notna(ma)]
+            
+            if len(meses_anos_validos) == 0:
                 abas_extra.append(html.Div([
                     html.H3("📋 Matriz Auditoria Risco"),
                     html.P("⚠️ Não foi possível extrair períodos (mês/ano) das datas.", 
                            style={'textAlign':'center', 'color':'#e74c3c', 'padding': '20px'}),
-                    html.P("Verifique se a coluna 'Data' na planilha está no formato dd/mm/aaaa.", 
+                    html.P("As datas na planilha podem estar em formato incorreto.", 
                            style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '10px'})
                 ], style={'marginTop':'30px'}))
             else:
@@ -712,10 +741,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     linha = {'Unidade': unidade_nome}
                     df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
                     
-                    for mes_ano in meses_anos:
-                        if pd.isna(mes_ano) or mes_ano == "Sem Data":
-                            continue
-                        
+                    for mes_ano in meses_anos_validos:
                         df_mes = df_unidade[df_unidade['Mes_Ano'] == mes_ano]
                         
                         if len(df_mes) > 0:
@@ -774,9 +800,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'zIndex': '1'
                 })]
                 
-                for mes_ano in meses_anos:
-                    if pd.isna(mes_ano) or mes_ano == "Sem Data":
-                        continue
+                for mes_ano in meses_anos_validos:
                     tabela_cabecalho.append(html.Th(str(mes_ano), style={
                         'backgroundColor': '#34495e',
                         'color': 'white',
@@ -803,10 +827,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                         'zIndex': '1'
                     })]
                     
-                    for mes_ano in meses_anos:
-                        if pd.isna(mes_ano) or mes_ano == "Sem Data":
-                            continue
-                        
+                    for mes_ano in meses_anos_validos:
                         conteudo = linha.get(mes_ano, "")
                         celulas.append(html.Td(
                             conteudo,
@@ -877,7 +898,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     html.H3(titulo_matriz, style={'marginBottom': '20px'}),
                     html.P(f"Período: {ano if ano != 'todos' else 'Todos'} {f'Mês: {mes}' if mes != 'todos' else ''}", 
                            style={'color': '#7f8c8d', 'marginBottom': '5px'}),
-                    html.P(f"Unidades: {len(unidades)} | Períodos: {len([ma for ma in meses_anos if ma != 'Sem Data'])}", 
+                    html.P(f"Unidades: {len(unidades)} | Períodos: {len(meses_anos_validos)}", 
                            style={'color': '#7f8c8d', 'marginBottom': '10px'}),
                     legenda,
                     tabela_container
