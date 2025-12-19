@@ -342,7 +342,7 @@ def carregar_dados_da_planilha():
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         
-                        # Criar Mes_Ano
+                        # Criar Mes_Ano para exibição (usado apenas no checklist)
                         df['Mes_Ano'] = df.apply(
                             lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
                             if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
@@ -420,12 +420,12 @@ def carregar_dados_da_planilha():
         if df_risco is not None and len(df_risco) > 0:
             print(f"\n📋 DETALHES DA MATRIZ DE RISCO:")
             print(f"  Colunas: {df_risco.columns.tolist()}")
-            if 'Mes_Ano' in df_risco.columns:
-                periodos_unicos = df_risco['Mes_Ano'].dropna().unique()
-                print(f"  Períodos únicos encontrados ({len(periodos_unicos)}):")
-                for periodo in sorted(periodos_unicos):
-                    contagem = len(df_risco[df_risco['Mes_Ano'] == periodo])
-                    print(f"    {periodo}: {contagem} registros")
+            if 'Ano' in df_risco.columns:
+                anos_unicos = df_risco['Ano'].dropna().unique()
+                print(f"  Anos únicos encontrados ({len(anos_unicos)}):")
+                for ano in sorted(anos_unicos):
+                    contagem = len(df_risco[df_risco['Ano'] == ano])
+                    print(f"    {int(ano)}: {contagem} registros")
         
         return df_checklist, df_politicas, df_risco, df_melhorias
 
@@ -451,22 +451,289 @@ def obter_anos_disponiveis(df_checklist):
     return sorted(anos_int, reverse=True)
 
 def obter_meses_disponiveis(df_checklist, ano_selecionado):
-    if df_checklist is None or 'Mes' not in df_checklist.columns:
-        return []
-    if ano_selecionado == 'todos':
-        meses = sorted(df_checklist['Mes'].dropna().unique())
-    else:
-        try:
-            ano_selecionado = int(ano_selecionado)
-            df_filtrado = df_checklist[df_checklist['Ano'] == ano_selecionado]
-            meses = sorted(df_filtrado['Mes'].dropna().unique())
-        except:
-            meses = []
+    """Retorna todos os meses (1-12) independentemente dos dados existentes"""
+    # Lista completa de todos os meses do ano
+    nomes_meses = {
+        1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 
+        5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 
+        9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez'
+    }
     
-    nomes_meses = {1:'Janeiro',2:'Fevereiro',3:'Março',4:'Abril',5:'Maio',6:'Junho',
-                   7:'Julho',8:'Agosto',9:'Setembro',10:'Outubro',11:'Novembro',12:'Dezembro'}
+    # Retorna todos os meses de 1 a 12
+    return [{'label': f'{nomes_meses[m]}', 'value': m} for m in range(1, 13)]
+
+def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
+    """Cria matriz de risco com todos os meses do ano - VERSÃO COMPACTA"""
     
-    return [{'label': f'{nomes_meses.get(int(m), str(m))}', 'value': int(m)} for m in meses]
+    # Verificar se temos dados
+    if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
+        return html.Div([
+            html.H3("📋 Matriz Auditoria Risco"),
+            html.P("Nenhum dado encontrado para o ano selecionado.", 
+                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '20px'})
+        ], style={'marginTop':'30px'})
+    
+    # Obter unidades únicas
+    unidades = sorted(df_risco_filtrado['Unidade'].dropna().unique())
+    
+    # Lista de meses do ano (1 a 12)
+    meses_ano = list(range(1, 13))
+    nomes_meses = {
+        1: 'J', 2: 'F', 3: 'M', 4: 'A', 5: 'M', 6: 'J',
+        7: 'J', 8: 'A', 9: 'S', 10: 'O', 11: 'N', 12: 'D'
+    }
+    nomes_completos = {
+        1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 
+        5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
+        9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'
+    }
+    
+    print(f"\n📊 CRIANDO MATRIZ DE RISCO PARA O ANO {ano_filtro}")
+    print(f"  Unidades: {unidades}")
+    print(f"  Total de registros: {len(df_risco_filtrado)}")
+    
+    # Criar estrutura de dados para a matriz
+    matriz_data = []
+    
+    for unidade_nome in unidades:
+        linha = {'Unidade': unidade_nome}
+        df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
+        
+        for mes in meses_ano:
+            # Filtrar por mês (converter para o tipo correto)
+            df_unidade['Mes'] = pd.to_numeric(df_unidade['Mes'], errors='coerce')
+            df_mes = df_unidade[df_unidade['Mes'] == mes]
+            
+            if len(df_mes) > 0:
+                # Para cada relatório no mês
+                relatorios_info = []
+                for _, row in df_mes.iterrows():
+                    relatorio = str(row.get('Relatorio', ''))
+                    status = str(row.get('Status', 'Sem Status'))
+                    cores = get_status_color(status)
+                    
+                    # Se o relatório for muito longo, abreviar
+                    if len(relatorio) > 20:
+                        relatorio_display = relatorio[:18] + '...'
+                    else:
+                        relatorio_display = relatorio
+                    
+                    # Criar tooltip com info completa
+                    relatorio_item = html.Span(
+                        "•",  # Ponto simples como marcador
+                        title=f"{relatorio} | Status: {status}",
+                        style={
+                            'display': 'inline-block',
+                            'backgroundColor': cores['bg_color'],
+                            'color': cores['text_color'],
+                            'padding': '2px 4px',
+                            'margin': '1px',
+                            'borderRadius': '2px',
+                            'fontSize': '10px',
+                            'fontWeight': 'bold',
+                            'borderLeft': f'2px solid {cores["border_color"]}',
+                            'cursor': 'pointer'
+                        }
+                    )
+                    relatorios_info.append(relatorio_item)
+                
+                if len(relatorios_info) > 0:
+                    # Agrupar em uma célula compacta
+                    linha[mes] = html.Div(
+                        relatorios_info,
+                        style={
+                            'display': 'flex',
+                            'flexWrap': 'wrap',
+                            'gap': '1px',
+                            'justifyContent': 'center',
+                            'alignItems': 'center',
+                            'minHeight': '25px',
+                            'maxWidth': '80px'
+                        }
+                    )
+                else:
+                    linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px'})
+            else:
+                linha[mes] = html.Div("-", style={'color': '#ccc', 'fontSize': '10px'})
+        
+        matriz_data.append(linha)
+    
+    # Criar tabela HTML COMPACTA
+    tabela_cabecalho = [html.Th("Unidade", style={
+        'backgroundColor': '#34495e',
+        'color': 'white',
+        'padding': '6px 8px',
+        'textAlign': 'center',
+        'fontWeight': 'bold',
+        'border': '1px solid #2c3e50',
+        'minWidth': '100px',
+        'maxWidth': '120px',
+        'fontSize': '11px',
+        'position': 'sticky',
+        'left': '0',
+        'zIndex': '1'
+    })]
+    
+    for mes in meses_ano:
+        tabela_cabecalho.append(html.Th(
+            html.Div([
+                html.Div(nomes_meses[mes], style={'fontSize': '11px', 'fontWeight': 'bold'}),
+                html.Div(str(mes), style={'fontSize': '9px', 'opacity': '0.7'})
+            ]),
+            style={
+                'backgroundColor': '#34495e',
+                'color': 'white',
+                'padding': '6px 4px',
+                'textAlign': 'center',
+                'fontWeight': 'bold',
+                'border': '1px solid #2c3e50',
+                'minWidth': '40px',
+                'maxWidth': '50px',
+                'fontSize': '11px'
+            },
+            title=nomes_completos[mes]
+        ))
+    
+    tabela_linhas = []
+    
+    for i, linha in enumerate(matriz_data):
+        bg_color = '#f8f9fa' if i % 2 == 0 else 'white'
+        
+        celulas = [html.Td(
+            html.Div(linha['Unidade'], style={
+                'fontSize': '10px',
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis',
+                'whiteSpace': 'nowrap'
+            }),
+            style={
+                'backgroundColor': bg_color,
+                'padding': '6px 8px',
+                'textAlign': 'left',
+                'border': '1px solid #dee2e6',
+                'fontWeight': 'bold',
+                'fontSize': '10px',
+                'minWidth': '100px',
+                'maxWidth': '120px',
+                'position': 'sticky',
+                'left': '0',
+                'zIndex': '1'
+            }
+        )]
+        
+        for mes in meses_ano:
+            conteudo = linha.get(mes, html.Div("-", style={'color': '#ccc', 'fontSize': '10px'}))
+            celulas.append(html.Td(
+                conteudo,
+                style={
+                    'backgroundColor': bg_color,
+                    'padding': '4px 2px',
+                    'textAlign': 'center',
+                    'border': '1px solid #dee2e6',
+                    'verticalAlign': 'middle',
+                    'minHeight': '30px',
+                    'minWidth': '40px',
+                    'maxWidth': '50px'
+                }
+            ))
+        
+        tabela_linhas.append(html.Tr(celulas, style={'borderBottom': '1px solid #dee2e6'}))
+    
+    tabela_html = html.Table([
+        html.Thead(html.Tr(tabela_cabecalho)),
+        html.Tbody(tabela_linhas)
+    ], style={
+        'width': '100%',
+        'borderCollapse': 'collapse',
+        'marginTop': '5px',
+        'fontFamily': 'Arial, sans-serif',
+        'fontSize': '10px',
+        'tableLayout': 'fixed'
+    })
+    
+    # Container compacto
+    tabela_container = html.Div(
+        tabela_html,
+        style={
+            'overflowX': 'auto',
+            'maxWidth': '100%',
+            'marginTop': '10px',
+            'border': '1px solid #dee2e6',
+            'borderRadius': '3px',
+            'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+            'maxHeight': '500px',  # Altura máxima
+            'overflowY': 'auto'    # Rolagem vertical se necessário
+        }
+    )
+    
+    # Legenda compacta
+    legenda = html.Div([
+        html.P("Legenda:", style={'marginBottom': '5px', 'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': 'bold'}),
+        html.Div([
+            html.Span("•", style={
+                'color': '#c0392b',
+                'marginRight': '3px',
+                'fontWeight': 'bold',
+                'fontSize': '12px'
+            }),
+            html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '10px', 'marginRight': '10px'}),
+            
+            html.Span("•", style={
+                'color': '#f39c12',
+                'marginRight': '3px',
+                'fontWeight': 'bold',
+                'fontSize': '12px'
+            }),
+            html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '10px', 'marginRight': '10px'}),
+            
+            html.Span("•", style={
+                'color': '#27ae60',
+                'marginRight': '3px',
+                'fontWeight': 'bold',
+                'fontSize': '12px'
+            }),
+            html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '10px', 'marginRight': '10px'}),
+            
+            html.Span("-", style={
+                'color': '#ccc',
+                'marginRight': '3px',
+                'fontWeight': 'bold',
+                'fontSize': '12px'
+            }),
+            html.Span("Sem dados", style={'color': '#2c3e50', 'fontSize': '10px'})
+        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '8px', 'alignItems': 'center'})
+    ], style={
+        'backgroundColor': '#f8f9fa',
+        'padding': '8px 10px',
+        'borderRadius': '3px',
+        'marginBottom': '10px',
+        'border': '1px solid #dee2e6',
+        'fontSize': '10px'
+    })
+    
+    titulo_matriz = f"📋 Matriz de Risco - {ano_filtro} ({len(df_risco_filtrado)} registros)"
+    
+    return html.Div([
+        html.H4(titulo_matriz, style={
+            'marginBottom': '10px', 
+            'color': '#2c3e50',
+            'fontSize': '14px',
+            'display': 'flex',
+            'alignItems': 'center',
+            'gap': '8px'
+        }),
+        html.P(f"Passe o mouse sobre os pontos para ver detalhes", 
+               style={'color': '#7f8c8d', 'marginBottom': '5px', 'fontSize': '10px'}),
+        legenda,
+        tabela_container
+    ], style={
+        'marginTop': '20px',
+        'padding': '15px',
+        'backgroundColor': 'white',
+        'borderRadius': '5px',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.1)',
+        'overflow': 'hidden'
+    })
 
 # ========== CARREGAR DADOS ==========
 df_checklist, df_politicas, df_risco, df_melhorias = carregar_dados_da_planilha()
@@ -490,47 +757,51 @@ auth = dash_auth.BasicAuth(app, USUARIOS_VALIDOS)
 
 # ========== LAYOUT DO DASHBOARD ==========
 app.layout = html.Div([
-    html.Div([html.H1("📊 DASHBOARD DE AUDITORIA", 
-                      style={'textAlign':'center', 'marginBottom':'20px'})]),
+    html.Div([
+        html.H1("📊 DASHBOARD DE AUDITORIA", 
+                style={
+                    'textAlign':'center', 
+                    'marginBottom':'15px',
+                    'fontSize': '22px',
+                    'color': '#2c3e50'
+                })
+    ]),
     html.Div([
         html.Div([
-            html.Label("Ano:"),
+            html.Label("Ano:", style={'fontSize': '12px', 'fontWeight': 'bold', 'marginBottom': '3px'}),
             dcc.Dropdown(
                 id='filtro-ano',
                 options=[{'label':'Todos','value':'todos'}]+
                        [{'label':str(a),'value':a} for a in anos_disponiveis],
-                value='todos'
+                value='todos',
+                style={'fontSize': '12px'}
             )
-        ], style={'marginRight':'20px','width':'200px'}),
+        ], style={'marginRight':'15px','width':'180px'}),
         html.Div([
-            html.Label("Mês:"),
+            html.Label("Mês:", style={'fontSize': '12px', 'fontWeight': 'bold', 'marginBottom': '3px'}),
             dcc.Dropdown(
                 id='filtro-mes',
-                options=[{'label':'Todos','value':'todos'}],
-                value='todos'
+                options=[{'label':'Todos','value':'todos'}]+
+                       [{'label':f'{m}','value':m} for m in range(1, 13)],
+                value='todos',
+                style={'fontSize': '12px'}
             )
-        ], style={'marginRight':'20px','width':'200px'}),
+        ], style={'marginRight':'15px','width':'150px'}),
         html.Div([
-            html.Label("Unidade:"),
+            html.Label("Unidade:", style={'fontSize': '12px', 'fontWeight': 'bold', 'marginBottom': '3px'}),
             dcc.Dropdown(
                 id='filtro-unidade',
                 options=[{'label':'Todas','value':'todas'}]+
                         [{'label':str(u),'value':str(u)} for u in sorted(df_checklist['Unidade'].dropna().unique())],
-                value='todas'
+                value='todas',
+                style={'fontSize': '12px'}
             )
-        ], style={'width':'250px'})
-    ], style={'display':'flex','justifyContent':'center','marginBottom':'30px','flexWrap':'wrap'}),
-    html.Div(id='conteudo-principal', style={'padding':'20px'})
+        ], style={'width':'200px'})
+    ], style={'display':'flex','justifyContent':'center','marginBottom':'25px','flexWrap':'wrap'}),
+    html.Div(id='conteudo-principal', style={'padding':'15px', 'maxWidth': '1400px', 'margin': '0 auto'})
 ])
 
 # ========== CALLBACKS ==========
-@app.callback(
-    Output('filtro-mes','options'),
-    Input('filtro-ano','value')
-)
-def atualizar_opcoes_mes(ano_selecionado):
-    return [{'label':'Todos','value':'todos'}]+obter_meses_disponiveis(df_checklist, ano_selecionado)
-
 @app.callback(
     Output('conteudo-principal','children'),
     [Input('filtro-ano','value'),
@@ -592,35 +863,29 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     # ---------- KPIs ----------
     kpis = html.Div([
         html.Div([
-            html.H4("Conforme", style={'color':'#27ae60','margin':'0'}),
-            html.H2(f"{conforme}", style={'color':'#27ae60','margin':'0'}),
-            html.P(f"{(conforme/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#27ae60'})
-        ], style={'borderLeft':'5px solid #27ae60','borderRadius':'5px','padding':'20px','margin':'10px','flex':'1',
-                  'backgroundColor':'#eafaf1','textAlign':'center','boxShadow':'2px 2px 5px rgba(0,0,0,0.1)'}),
+            html.H4("Conforme", style={'color':'#27ae60','margin':'0', 'fontSize': '14px'}),
+            html.H2(f"{conforme}", style={'color':'#27ae60','margin':'0', 'fontSize': '28px'}),
+            html.P(f"{(conforme/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#27ae60', 'fontSize': '12px'})
+        ], style={'borderLeft':'5px solid #27ae60','borderRadius':'5px','padding':'15px','margin':'8px','flex':'1',
+                  'backgroundColor':'#eafaf1','textAlign':'center','boxShadow':'1px 1px 3px rgba(0,0,0,0.1)',
+                  'minWidth': '150px'}),
 
         html.Div([
-            html.H4("Conforme Parcialmente", style={'color':'#f39c12','margin':'0'}),
-            html.H2(f"{parcial}", style={'color':'#f39c12','margin':'0'}),
-            html.P(f"{(parcial/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#f39c12'})
-        ], style={'borderLeft':'5px solid #f39c12','borderRadius':'5px','padding':'20px','margin':'10px','flex':'1',
-                  'backgroundColor':'#fff8e1','textAlign':'center','boxShadow':'2px 2px 5px rgba(0,0,0,0.1)'}),
+            html.H4("Conforme Parcialmente", style={'color':'#f39c12','margin':'0', 'fontSize': '14px'}),
+            html.H2(f"{parcial}", style={'color':'#f39c12','margin':'0', 'fontSize': '28px'}),
+            html.P(f"{(parcial/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#f39c12', 'fontSize': '12px'})
+        ], style={'borderLeft':'5px solid #f39c12','borderRadius':'5px','padding':'15px','margin':'8px','flex':'1',
+                  'backgroundColor':'#fff8e1','textAlign':'center','boxShadow':'1px 1px 3px rgba(0,0,0,0.1)',
+                  'minWidth': '150px'}),
 
         html.Div([
-            html.H4("Não Conforme", style={'color':'#e74c3c','margin':'0'}),
-            html.H2(f"{nao}", style={'color':'#e74c3c','margin':'0'}),
-            html.P(f"{(nao/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#e74c3c'})
-        ], style={'borderLeft':'5px solid #e74c3c','borderRadius':'5px','padding':'20px','margin':'10px','flex':'1',
-                  'backgroundColor':'#fdecea','textAlign':'center','boxShadow':'2px 2px 5px rgba(0,0,0,0.1)'})
-    ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'30px'})
-
-    # ---------- Gráfico ----------
-    fig = px.pie(
-        names=['Conforme','Conforme Parcialmente','Não Conforme'],
-        values=[conforme,parcial,nao],
-        color=['Conforme','Conforme Parcialmente','Não Conforme'],
-        color_discrete_map={'Conforme':'#27ae60','Conforme Parcialmente':'#f39c12','Não Conforme':'#e74c3c'},
-        title="Distribuição de Status - Checklist"
-    )
+            html.H4("Não Conforme", style={'color':'#e74c3c','margin':'0', 'fontSize': '14px'}),
+            html.H2(f"{nao}", style={'color':'#e74c3c','margin':'0', 'fontSize': '28px'}),
+            html.P(f"{(nao/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#e74c3c', 'fontSize': '12px'})
+        ], style={'borderLeft':'5px solid #e74c3c','borderRadius':'5px','padding':'15px','margin':'8px','flex':'1',
+                  'backgroundColor':'#fdecea','textAlign':'center','boxShadow':'1px 1px 3px rgba(0,0,0,0.1)',
+                  'minWidth': '150px'})
+    ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'25px', 'gap': '5px'})
 
     # ---------- Tabela de NÃO CONFORMES COM COMPARAÇÃO DE PRAZOS ----------
     df_nao_conforme = df[df['Status']=='Não Conforme']
@@ -685,20 +950,34 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'Status_Prazo': 'Status do Prazo'
             })
             
-            # Criar tabela com cores condicionais
+            # Criar tabela com cores condicionais - FONTE MENOR
             tabela_nao_conforme = dash_table.DataTable(
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
                 page_size=10,
-                style_table={'overflowX':'auto'},
-                style_header={'backgroundColor': '#c0392b','color': 'white','fontWeight': 'bold','textAlign':'center'},
-                style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
+                style_table={'overflowX':'auto', 'fontSize': '11px'},
+                style_header={
+                    'backgroundColor': '#c0392b',
+                    'color': 'white',
+                    'fontWeight': 'bold',
+                    'textAlign':'center',
+                    'fontSize': '11px',
+                    'padding': '6px 8px'
+                },
+                style_cell={
+                    'textAlign': 'center',
+                    'padding': '4px 6px',
+                    'whiteSpace':'normal',
+                    'height':'auto',
+                    'fontSize': '10px',
+                    'minWidth': '50px'
+                },
                 style_data_conditional=[
                     # Linhas pares
                     {'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
                     # Linhas ímpares
                     {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'},
-                    # Cores condicionais para Status do Prazo - CORREÇÃO ADICIONADA
+                    # Cores condicionais para Status do Prazo
                     {
                         'if': {
                             'filter_query': '{Status do Prazo} = "Concluído no Prazo"',
@@ -728,16 +1007,16 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             
             # Adicionar legenda
             legenda_prazo = html.Div([
-                html.P("📌 Legenda do Status do Prazo:", style={'fontWeight':'bold','marginBottom':'5px'}),
+                html.P("📌 Legenda do Status do Prazo:", style={'fontWeight':'bold','marginBottom':'3px', 'fontSize': '11px'}),
                 html.Div([
-                    html.Span("🟢 ", style={'color':'#27ae60','marginRight':'5px'}),
-                    html.Span("Concluído no Prazo", style={'marginRight':'15px','color':'#27ae60'}),
-                    html.Span("🟡 ", style={'color':'#f39c12','marginRight':'5px'}),
-                    html.Span("Não Concluído", style={'marginRight':'15px','color':'#f39c12'}),
-                    html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'5px'}),
-                    html.Span("Concluído Fora do Prazo", style={'color':'#e74c3c'})
-                ], style={'backgroundColor':'#f8f9fa','padding':'10px','borderRadius':'5px','marginBottom':'10px'})
-            ], style={'marginBottom':'20px'})
+                    html.Span("🟢 ", style={'color':'#27ae60','marginRight':'3px', 'fontSize': '10px'}),
+                    html.Span("Concluído no Prazo", style={'marginRight':'10px','color':'#27ae60', 'fontSize': '10px'}),
+                    html.Span("🟡 ", style={'color':'#f39c12','marginRight':'3px', 'fontSize': '10px'}),
+                    html.Span("Não Concluído", style={'marginRight':'10px','color':'#f39c12', 'fontSize': '10px'}),
+                    html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'3px', 'fontSize': '10px'}),
+                    html.Span("Concluído Fora do Prazo", style={'color':'#e74c3c', 'fontSize': '10px'})
+                ], style={'backgroundColor':'#f8f9fa','padding':'6px 8px','borderRadius':'3px','marginBottom':'8px', 'fontSize': '10px'})
+            ], style={'marginBottom':'15px'})
             
         else:
             # Se não encontrou as colunas, mostrar tabela normal
@@ -761,9 +1040,23 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
                 page_size=10,
-                style_table={'overflowX':'auto'},
-                style_header={'backgroundColor': '#c0392b','color': 'white','fontWeight': 'bold','textAlign':'center'},
-                style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
+                style_table={'overflowX':'auto', 'fontSize': '11px'},
+                style_header={
+                    'backgroundColor': '#c0392b',
+                    'color': 'white',
+                    'fontWeight': 'bold',
+                    'textAlign':'center',
+                    'fontSize': '11px',
+                    'padding': '6px 8px'
+                },
+                style_cell={
+                    'textAlign': 'center',
+                    'padding': '4px 6px',
+                    'whiteSpace':'normal',
+                    'height':'auto',
+                    'fontSize': '10px',
+                    'minWidth': '50px'
+                },
                 style_data_conditional=[
                     {'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
                     {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'}
@@ -773,13 +1066,14 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     else:
         tabela_nao_conforme = html.Div([
             html.P("✅ Nenhum item não conforme encontrado com os filtros atuais.", 
-                   style={'textAlign': 'center', 'padding': '20px', 'color': '#27ae60'})
+                   style={'textAlign': 'center', 'padding': '15px', 'color': '#27ae60', 'fontSize': '12px'})
         ])
         legenda_prazo = html.Div()
     
-    tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)")
+    tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)", 
+                           style={'marginTop': '25px', 'marginBottom': '10px', 'color': '#c0392b', 'fontSize': '16px'})
 
-    # ---------- Matriz de Risco (COM FILTROS) ----------
+    # ---------- Matriz de Risco (APENAS ANO) ----------
     abas_extra = []
 
     if df_risco is not None and len(df_risco) > 0:
@@ -788,260 +1082,59 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         
         df_risco_filtrado = df_risco.copy()
         
-        # Aplicar filtros
+        # Aplicar APENAS filtro de ano para a matriz de risco
         filtros_aplicados = False
         
         if 'Ano' in df_risco_filtrado.columns:
             df_risco_filtrado['Ano'] = pd.to_numeric(df_risco_filtrado['Ano'], errors='coerce')
         
-        if 'Mes' in df_risco_filtrado.columns:
-            df_risco_filtrado['Mes'] = pd.to_numeric(df_risco_filtrado['Mes'], errors='coerce')
-        
+        # Aplicar filtro de ano se não for 'todos'
         if ano != 'todos' and 'Ano' in df_risco_filtrado.columns:
             try:
                 ano_int = int(ano)
                 df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
-                print(f"  ✅ Filtro ANO aplicado: {ano_int}")
+                print(f"  ✅ Filtro ANO aplicado para matriz de risco: {ano_int}")
                 filtros_aplicados = True
             except:
                 pass
         
-        if mes != 'todos' and 'Mes' in df_risco_filtrado.columns:
-            try:
-                mes_int = int(mes)
-                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == mes_int]
-                print(f"  ✅ Filtro MÊS aplicado: {mes_int}")
-                filtros_aplicados = True
-            except:
-                pass
-        
+        # Aplicar filtro de unidade se não for 'todas'
         if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
             df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
-            print(f"  ✅ Filtro UNIDADE aplicado: '{unidade}'")
+            print(f"  ✅ Filtro UNIDADE aplicado para matriz de risco: '{unidade}'")
             filtros_aplicados = True
+        
+        # NÃO aplicar filtro de mês para a matriz de risco (mostrar ano completo)
 
-        print(f"\n📋 Matriz após filtros: {len(df_risco_filtrado)} registros")
+        print(f"\n📋 Matriz após filtros (ano completo): {len(df_risco_filtrado)} registros")
         
         if len(df_risco_filtrado) > 0:
-            # Garantir que temos coluna Mes_Ano
-            if 'Mes_Ano' not in df_risco_filtrado.columns:
-                if 'Mes' in df_risco_filtrado.columns and 'Ano' in df_risco_filtrado.columns:
-                    df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
-                        lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
-                        if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
-                        else "Sem Data", 
-                        axis=1
-                    )
-                else:
-                    df_risco_filtrado['Mes_Ano'] = "Sem Data"
-            
-            # Agrupar dados por Unidade e Mes_Ano
-            unidades = sorted(df_risco_filtrado['Unidade'].dropna().unique())
-            meses_anos = sorted(df_risco_filtrado['Mes_Ano'].dropna().unique())
-            
-            print(f"  📊 Unidades encontradas: {len(unidades)}")
-            print(f"  📅 Períodos encontrados: {len(meses_anos)}")
-            print(f"  Períodos: {meses_anos}")
-            
-            # Filtrar apenas períodos válidos (não "Sem Data")
-            meses_anos_validos = [ma for ma in meses_anos if ma != "Sem Data" and pd.notna(ma)]
-            
-            if len(meses_anos_validos) == 0:
-                abas_extra.append(html.Div([
-                    html.H3("📋 Matriz Auditoria Risco"),
-                    html.P("⚠️ Não foi possível extrair períodos (mês/ano) das datas.", 
-                           style={'textAlign':'center', 'color':'#e74c3c', 'padding': '20px'}),
-                    html.P("As datas na planilha podem estar em formato incorreto.", 
-                           style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '10px'})
-                ], style={'marginTop':'30px'}))
+            # Determinar qual ano usar para a matriz
+            if ano != 'todos':
+                ano_matriz = int(ano)
             else:
-                # Criar estrutura de dados para a matriz
-                matriz_data = []
-                
-                for unidade_nome in unidades:
-                    linha = {'Unidade': unidade_nome}
-                    df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
-                    
-                    for mes_ano in meses_anos_validos:
-                        df_mes = df_unidade[df_unidade['Mes_Ano'] == mes_ano]
-                        
-                        if len(df_mes) > 0:
-                            relatorios_html = []
-                            for _, row in df_mes.iterrows():
-                                relatorio = str(row.get('Relatorio', 'Sem Relatório'))
-                                status = str(row.get('Status', 'Sem Status'))
-                                cores = get_status_color(status)
-                                
-                                relatorio_item = html.Span(
-                                    relatorio,
-                                    style={
-                                        'display': 'inline-block',
-                                        'backgroundColor': cores['bg_color'],
-                                        'color': cores['text_color'],
-                                        'padding': '4px 8px',
-                                        'margin': '2px',
-                                        'borderRadius': '3px',
-                                        'fontSize': '12px',
-                                        'fontWeight': 'bold',
-                                        'borderLeft': f'3px solid {cores["border_color"]}'
-                                    }
-                                )
-                                relatorios_html.append(relatorio_item)
-                            
-                            if len(relatorios_html) > 0:
-                                linha[mes_ano] = html.Div(
-                                    relatorios_html,
-                                    style={
-                                        'display': 'flex',
-                                        'flexWrap': 'wrap',
-                                        'gap': '3px',
-                                        'justifyContent': 'center',
-                                        'alignItems': 'center',
-                                        'minHeight': '40px'
-                                    }
-                                )
-                            else:
-                                linha[mes_ano] = ""
-                        else:
-                            linha[mes_ano] = ""
-                    
-                    matriz_data.append(linha)
-                
-                # Criar tabela HTML
-                tabela_cabecalho = [html.Th("Unidade", style={
-                    'backgroundColor': '#34495e',
-                    'color': 'white',
-                    'padding': '12px',
-                    'textAlign': 'center',
-                    'fontWeight': 'bold',
-                    'border': '1px solid #2c3e50',
-                    'minWidth': '150px',
-                    'position': 'sticky',
-                    'left': '0',
-                    'zIndex': '1'
-                })]
-                
-                for mes_ano in meses_anos_validos:
-                    tabela_cabecalho.append(html.Th(str(mes_ano), style={
-                        'backgroundColor': '#34495e',
-                        'color': 'white',
-                        'padding': '12px',
-                        'textAlign': 'center',
-                        'fontWeight': 'bold',
-                        'border': '1px solid #2c3e50',
-                        'minWidth': '200px'
-                    }))
-                
-                tabela_linhas = []
-                
-                for i, linha in enumerate(matriz_data):
-                    bg_color = '#f8f9fa' if i % 2 == 0 else 'white'
-                    
-                    celulas = [html.Td(linha['Unidade'], style={
-                        'backgroundColor': bg_color,
-                        'padding': '10px',
-                        'textAlign': 'center',
-                        'border': '1px solid #dee2e6',
-                        'fontWeight': 'bold',
-                        'position': 'sticky',
-                        'left': '0',
-                        'zIndex': '1'
-                    })]
-                    
-                    for mes_ano in meses_anos_validos:
-                        conteudo = linha.get(mes_ano, "")
-                        celulas.append(html.Td(
-                            conteudo,
-                            style={
-                                'backgroundColor': bg_color,
-                                'padding': '8px',
-                                'textAlign': 'center',
-                                'border': '1px solid #dee2e6',
-                                'verticalAlign': 'middle',
-                                'minHeight': '50px'
-                            }
-                        ))
-                    
-                    tabela_linhas.append(html.Tr(celulas, style={'borderBottom': '1px solid #dee2e6'}))
-                
-                tabela_html = html.Table([
-                    html.Thead(html.Tr(tabela_cabecalho)),
-                    html.Tbody(tabela_linhas)
-                ], style={
-                    'width': '100%',
-                    'borderCollapse': 'collapse',
-                    'marginTop': '10px',
-                    'fontFamily': 'Arial, sans-serif',
-                    'fontSize': '14px'
-                })
-                
-                tabela_container = html.Div(
-                    tabela_html,
-                    style={
-                        'overflowX': 'auto',
-                        'maxWidth': '100%',
-                        'marginTop': '15px',
-                        'border': '1px solid #dee2e6',
-                        'borderRadius': '5px',
-                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-                    }
-                )
-                
-                legenda = html.Div([
-                    html.H4("Legenda de Status:", style={'marginBottom': '10px', 'color': '#2c3e50'}),
-                    html.Div([
-                        html.Div([
-                            html.Span("🔴 ", style={'fontSize': '16px', 'marginRight': '5px'}),
-                            html.Span("Não Iniciado", style={'color': '#2c3e50'})
-                        ], style={'display': 'inline-block', 'marginRight': '20px'}),
-                        
-                        html.Div([
-                            html.Span("🟡 ", style={'fontSize': '16px', 'marginRight': '5px'}),
-                            html.Span("Pendente", style={'color': '#2c3e50'})
-                        ], style={'display': 'inline-block', 'marginRight': '20px'}),
-                        
-                        html.Div([
-                            html.Span("🟢 ", style={'fontSize': '16px', 'marginRight': '5px'}),
-                            html.Span("Finalizado", style={'color': '#2c3e50'})
-                        ], style={'display': 'inline-block'})
-                    ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px'})
-                ], style={
-                    'backgroundColor': '#f8f9fa',
-                    'padding': '15px',
-                    'borderRadius': '5px',
-                    'marginBottom': '20px',
-                    'border': '1px solid #dee2e6'
-                })
-                
-                titulo_matriz = f"📋 Matriz Auditoria Risco ({len(df_risco_filtrado)} registros)"
-                
-                abas_extra.append(html.Div([
-                    html.H3(titulo_matriz, style={'marginBottom': '20px'}),
-                    html.P(f"Período: {ano if ano != 'todos' else 'Todos'} {f'Mês: {mes}' if mes != 'todos' else ''}", 
-                           style={'color': '#7f8c8d', 'marginBottom': '5px'}),
-                    html.P(f"Unidades: {len(unidades)} | Períodos: {len(meses_anos_validos)}", 
-                           style={'color': '#7f8c8d', 'marginBottom': '10px'}),
-                    legenda,
-                    tabela_container
-                ], style={
-                    'marginTop': '30px',
-                    'padding': '25px',
-                    'backgroundColor': 'white',
-                    'borderRadius': '8px',
-                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
-                }))
+                # Se 'todos', usar o primeiro ano disponível
+                anos_disponiveis = sorted(df_risco_filtrado['Ano'].dropna().unique())
+                if len(anos_disponiveis) > 0:
+                    ano_matriz = int(anos_disponiveis[0])
+                else:
+                    ano_matriz = datetime.now().year
+            
+            # Criar matriz de risco anual
+            matriz_risco = criar_matriz_risco_anual(df_risco_filtrado, ano_matriz)
+            abas_extra.append(matriz_risco)
         else:
             abas_extra.append(html.Div([
-                html.H3("📋 Matriz Auditoria Risco"),
-                html.P("Nenhum dado encontrado com os filtros atuais.", 
-                       style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '40px'})
-            ], style={'marginTop':'30px'}))
+                html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '16px'}),
+                html.P("Nenhum dado encontrado para o ano selecionado.", 
+                       style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '20px', 'fontSize': '12px'})
+            ], style={'marginTop':'20px'}))
     else:
         abas_extra.append(html.Div([
-            html.H3("📋 Matriz Auditoria Risco"),
+            html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '16px'}),
             html.P("Não há dados de risco disponíveis.", 
-                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '40px'})
-        ], style={'marginTop':'30px'}))
+                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '20px', 'fontSize': '12px'})
+        ], style={'marginTop':'20px'}))
 
     # ---------- Melhorias e Políticas ----------
     if df_melhorias is not None and len(df_melhorias) > 0:
@@ -1057,18 +1150,33 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             columns=[{"name": col, "id": col} for col in df_melhorias_display.columns],
             data=df_melhorias_display.to_dict('records'),
             page_size=10,
-            style_table={'overflowX':'auto','marginTop':'10px'},
-            style_header={'backgroundColor': '#34495e','color': 'white','fontWeight': 'bold','textAlign':'center'},
-            style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
-            style_data_conditional=[{'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
-                                    {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}]
+            style_table={'overflowX':'auto','marginTop':'8px', 'fontSize': '11px'},
+            style_header={
+                'backgroundColor': '#34495e',
+                'color': 'white',
+                'fontWeight': 'bold',
+                'textAlign':'center',
+                'fontSize': '11px',
+                'padding': '6px 8px'
+            },
+            style_cell={
+                'textAlign': 'center',
+                'padding': '4px 6px',
+                'whiteSpace':'normal',
+                'height':'auto',
+                'fontSize': '10px'
+            },
+            style_data_conditional=[
+                {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
+                {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
+            ]
         )
         abas_extra.append(html.Div([
-            html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)"),
+            html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)", style={'fontSize': '16px', 'marginBottom': '8px'}),
             html.P("Todos os registros de melhorias (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '10px'}),
+                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '11px'}),
             tabela_melhorias
-        ], style={'marginTop':'30px'}))
+        ], style={'marginTop':'20px'}))
 
     if df_politicas is not None and len(df_politicas) > 0:
         colunas_data_politicas = [col for col in df_politicas.columns 
@@ -1083,27 +1191,41 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
             data=df_politicas_display.to_dict('records'),
             page_size=10,
-            style_table={'overflowX':'auto','marginTop':'10px'},
-            style_header={'backgroundColor': '#34495e','color': 'white','fontWeight': 'bold','textAlign':'center'},
-            style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
-            style_data_conditional=[{'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
-                                    {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}]
+            style_table={'overflowX':'auto','marginTop':'8px', 'fontSize': '11px'},
+            style_header={
+                'backgroundColor': '#34495e',
+                'color': 'white',
+                'fontWeight': 'bold',
+                'textAlign':'center',
+                'fontSize': '11px',
+                'padding': '6px 8px'
+            },
+            style_cell={
+                'textAlign': 'center',
+                'padding': '4px 6px',
+                'whiteSpace':'normal',
+                'height':'auto',
+                'fontSize': '10px'
+            },
+            style_data_conditional=[
+                {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
+                {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
+            ]
         )
         abas_extra.append(html.Div([
-            html.H3(f"📑 Políticas ({len(df_politicas)} registros)"),
+            html.H3(f"📑 Políticas ({len(df_politicas)} registros)", style={'fontSize': '16px', 'marginBottom': '8px'}),
             html.P("Todos os registros de políticas (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '10px'}),
+                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '11px'}),
             tabela_politicas
-        ], style={'marginTop':'30px'}))
+        ], style={'marginTop':'20px'}))
 
     # ---------- Layout Final ----------
     return html.Div([
         html.Div([
             html.H4(f"📊 Resumo - {len(df)} itens auditados", 
-                    style={'textAlign':'center', 'color':'#2c3e50', 'marginBottom':'20px'})
+                    style={'textAlign':'center', 'color':'#2c3e50', 'marginBottom':'15px', 'fontSize': '18px'})
         ]),
         kpis,
-        dcc.Graph(figure=fig),
         tabela_titulo,
         legenda_prazo,
         tabela_nao_conforme,
@@ -1113,6 +1235,10 @@ def atualizar_conteudo_principal(ano, mes, unidade):
 # ========== EXECUÇÃO DO APP ==========
 if __name__ == '__main__':
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
+    print("📊 DASHBOARD OTIMIZADO:")
+    print("  - ✅ Gráfico de pizza REMOVIDO (já temos KPIs)")
+    print("  - ✅ Matriz de risco COMPACTA (cabe na tela)")
+    print("  - ✅ Fontes menores para melhor visualização")
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
