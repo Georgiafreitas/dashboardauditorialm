@@ -622,41 +622,162 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         title="Distribuição de Status - Checklist"
     )
 
-    # ---------- Tabela de NÃO CONFORMES ----------
+    # ---------- Tabela de NÃO CONFORMES COM COMPARAÇÃO DE PRAZOS ----------
     df_nao_conforme = df[df['Status']=='Não Conforme']
     
     if len(df_nao_conforme) > 0:
+        # Fazer uma cópia para não modificar o original
         df_nao_conforme_display = df_nao_conforme.copy()
         
-        colunas_para_remover = ['Ano', 'Mes', 'Mes_Ano']
-        for col in colunas_para_remover:
-            if col in df_nao_conforme_display.columns:
-                df_nao_conforme_display = df_nao_conforme_display.drop(columns=[col])
+        # Procurar colunas de prazo e data de finalização
+        colunas_disponiveis = df_nao_conforme_display.columns.tolist()
+        colunas_lower = [str(col).lower() for col in colunas_disponiveis]
         
-        colunas_data = [col for col in df_nao_conforme_display.columns 
-                       if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
+        # Procurar coluna de prazo
+        coluna_prazo = None
+        prazo_keywords = ['prazo', 'prazo_final', 'data_prazo', 'data_limite', 'limite']
+        for keyword in prazo_keywords:
+            for idx, col_lower in enumerate(colunas_lower):
+                if keyword in col_lower:
+                    coluna_prazo = colunas_disponiveis[idx]
+                    break
+            if coluna_prazo:
+                break
         
-        for coluna_data in colunas_data:
-            if coluna_data in df_nao_conforme_display.columns:
-                df_nao_conforme_display[coluna_data] = df_nao_conforme_display[coluna_data].apply(formatar_data)
+        # Procurar coluna de data de finalização
+        coluna_finalizacao = None
+        finalizacao_keywords = ['data_finalizacao', 'data_conclusao', 'finalizacao', 'conclusao', 
+                               'data_encerramento', 'data_termino']
+        for keyword in finalizacao_keywords:
+            for idx, col_lower in enumerate(colunas_lower):
+                if keyword in col_lower:
+                    coluna_finalizacao = colunas_disponiveis[idx]
+                    break
+            if coluna_finalizacao:
+                break
         
-        tabela_nao_conforme = dash_table.DataTable(
-            df_nao_conforme_display.to_dict('records'),
-            columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
-            page_size=10,
-            style_table={'overflowX':'auto'},
-            style_header={'backgroundColor': '#c0392b','color': 'white','fontWeight': 'bold','textAlign':'center'},
-            style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
-            style_data_conditional=[{'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
-                                    {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'}]
-        )
-        tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)")
+        # Se encontrou ambas as colunas, calcular status do prazo
+        if coluna_prazo and coluna_finalizacao:
+            print(f"✅ Encontradas colunas de prazo: '{coluna_prazo}' e finalização: '{coluna_finalizacao}'")
+            
+            # Formatar datas
+            df_nao_conforme_display['Prazo_Formatado'] = df_nao_conforme_display[coluna_prazo].apply(formatar_data)
+            df_nao_conforme_display['Finalizacao_Formatada'] = df_nao_conforme_display[coluna_finalizacao].apply(formatar_data)
+            
+            # Calcular status do prazo
+            df_nao_conforme_display['Status_Prazo'] = df_nao_conforme_display.apply(
+                lambda row: calcular_status_prazo(row[coluna_prazo], row[coluna_finalizacao]), 
+                axis=1
+            )
+            
+            # Reordenar colunas para melhor visualização
+            colunas_ordenadas = ['Unidade', 'Status', 'Status_Prazo', 'Prazo_Formatado', 'Finalizacao_Formatada']
+            colunas_restantes = [col for col in df_nao_conforme_display.columns 
+                                if col not in colunas_ordenadas + [coluna_prazo, coluna_finalizacao]]
+            
+            colunas_finais = colunas_ordenadas + colunas_restantes
+            df_nao_conforme_display = df_nao_conforme_display[colunas_finais]
+            
+            # Renomear colunas para exibição
+            df_nao_conforme_display = df_nao_conforme_display.rename(columns={
+                'Prazo_Formatado': 'Prazo',
+                'Finalizacao_Formatada': 'Data Finalização',
+                'Status_Prazo': 'Status do Prazo'
+            })
+            
+            # Criar tabela com cores condicionais
+            tabela_nao_conforme = dash_table.DataTable(
+                columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
+                data=df_nao_conforme_display.to_dict('records'),
+                page_size=10,
+                style_table={'overflowX':'auto'},
+                style_header={'backgroundColor': '#c0392b','color': 'white','fontWeight': 'bold','textAlign':'center'},
+                style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
+                style_data_conditional=[
+                    # Linhas pares
+                    {'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
+                    # Linhas ímpares
+                    {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'},
+                    # Cores condicionais para Status do Prazo - CORREÇÃO ADICIONADA
+                    {
+                        'if': {
+                            'filter_query': '{Status do Prazo} = "Concluído no Prazo"',
+                        },
+                        'backgroundColor': '#d4edda',
+                        'color': '#155724',
+                        'fontWeight': 'bold'
+                    },
+                    {
+                        'if': {
+                            'filter_query': '{Status do Prazo} = "Concluído Fora do Prazo"',
+                        },
+                        'backgroundColor': '#f8d7da',
+                        'color': '#721c24',
+                        'fontWeight': 'bold'
+                    },
+                    {
+                        'if': {
+                            'filter_query': '{Status do Prazo} = "Não Concluído"',
+                        },
+                        'backgroundColor': '#fff3cd',
+                        'color': '#856404',
+                        'fontWeight': 'bold'
+                    }
+                ]
+            )
+            
+            # Adicionar legenda
+            legenda_prazo = html.Div([
+                html.P("📌 Legenda do Status do Prazo:", style={'fontWeight':'bold','marginBottom':'5px'}),
+                html.Div([
+                    html.Span("🟢 ", style={'color':'#27ae60','marginRight':'5px'}),
+                    html.Span("Concluído no Prazo", style={'marginRight':'15px','color':'#27ae60'}),
+                    html.Span("🟡 ", style={'color':'#f39c12','marginRight':'5px'}),
+                    html.Span("Não Concluído", style={'marginRight':'15px','color':'#f39c12'}),
+                    html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'5px'}),
+                    html.Span("Concluído Fora do Prazo", style={'color':'#e74c3c'})
+                ], style={'backgroundColor':'#f8f9fa','padding':'10px','borderRadius':'5px','marginBottom':'10px'})
+            ], style={'marginBottom':'20px'})
+            
+        else:
+            # Se não encontrou as colunas, mostrar tabela normal
+            print(f"⚠️ Não encontrou colunas de prazo/finalização. Colunas disponíveis: {colunas_disponiveis}")
+            
+            # Remover colunas desnecessárias
+            colunas_para_remover = ['Ano', 'Mes', 'Mes_Ano']
+            for col in colunas_para_remover:
+                if col in df_nao_conforme_display.columns:
+                    df_nao_conforme_display = df_nao_conforme_display.drop(columns=[col])
+            
+            # Formatar datas se houver
+            colunas_data = [col for col in df_nao_conforme_display.columns 
+                           if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
+            
+            for coluna_data in colunas_data:
+                if coluna_data in df_nao_conforme_display.columns:
+                    df_nao_conforme_display[coluna_data] = df_nao_conforme_display[coluna_data].apply(formatar_data)
+            
+            tabela_nao_conforme = dash_table.DataTable(
+                columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
+                data=df_nao_conforme_display.to_dict('records'),
+                page_size=10,
+                style_table={'overflowX':'auto'},
+                style_header={'backgroundColor': '#c0392b','color': 'white','fontWeight': 'bold','textAlign':'center'},
+                style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
+                style_data_conditional=[
+                    {'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
+                    {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'}
+                ]
+            )
+            legenda_prazo = html.Div()
     else:
         tabela_nao_conforme = html.Div([
             html.P("✅ Nenhum item não conforme encontrado com os filtros atuais.", 
                    style={'textAlign': 'center', 'padding': '20px', 'color': '#27ae60'})
         ])
-        tabela_titulo = html.H3("❌ Itens Não Conformes (0 itens)")
+        legenda_prazo = html.Div()
+    
+    tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)")
 
     # ---------- Matriz de Risco (COM FILTROS) ----------
     abas_extra = []
@@ -933,7 +1054,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 df_melhorias_display[coluna_data] = df_melhorias_display[coluna_data].apply(formatar_data)
         
         tabela_melhorias = dash_table.DataTable(
-            df_melhorias_display.to_dict('records'),
+            columns=[{"name": col, "id": col} for col in df_melhorias_display.columns],
+            data=df_melhorias_display.to_dict('records'),
             page_size=10,
             style_table={'overflowX':'auto','marginTop':'10px'},
             style_header={'backgroundColor': '#34495e','color': 'white','fontWeight': 'bold','textAlign':'center'},
@@ -958,7 +1080,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
         
         tabela_politicas = dash_table.DataTable(
-            df_politicas_display.to_dict('records'),
+            columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
+            data=df_politicas_display.to_dict('records'),
             page_size=10,
             style_table={'overflowX':'auto','marginTop':'10px'},
             style_header={'backgroundColor': '#34495e','color': 'white','fontWeight': 'bold','textAlign':'center'},
@@ -973,6 +1096,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             tabela_politicas
         ], style={'marginTop':'30px'}))
 
+    # ---------- Layout Final ----------
     return html.Div([
         html.Div([
             html.H4(f"📊 Resumo - {len(df)} itens auditados", 
@@ -981,6 +1105,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         kpis,
         dcc.Graph(figure=fig),
         tabela_titulo,
+        legenda_prazo,
         tabela_nao_conforme,
         *abas_extra
     ])
