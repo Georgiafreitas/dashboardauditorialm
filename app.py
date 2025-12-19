@@ -129,6 +129,56 @@ def formatar_data(data_str):
         print(f"Erro ao formatar data '{data_str}': {e}")
         return str(data_str)
 
+def criar_sigla_relatorio(relatorio, index):
+    """Cria uma sigla única para o relatório baseada no nome ou índice"""
+    if pd.isna(relatorio) or str(relatorio).strip() == '':
+        return f"R{index:03d}"
+    
+    relatorio_str = str(relatorio).strip().upper()
+    
+    # Tenta extrair sigla de padrões comuns
+    # Padrão: "AUD-2023-001" -> "A23001"
+    padrao_aud = re.match(r'([A-Z]{2,})-(\d{2,4})-(\d{2,})', relatorio_str)
+    if padrao_aud:
+        prefixo = padrao_aud.group(1)[:2]  # Primeiras 2 letras
+        ano = padrao_aud.group(2)[-2:]     # Últimos 2 dígitos do ano
+        numero = padrao_aud.group(3)[:3]   # Primeiros 3 dígitos do número
+        return f"{prefixo}{ano}{numero}"
+    
+    # Padrão: "RELATORIO 2023-001" -> "R23001"
+    padrao_rel = re.match(r'RELATORIO\s*(\d{2,4})-?(\d{2,})', relatorio_str, re.IGNORECASE)
+    if padrao_rel:
+        ano = padrao_rel.group(1)[-2:]
+        numero = padrao_rel.group(2)[:3]
+        return f"R{ano}{numero}"
+    
+    # Padrão: "AUDITORIA JANEIRO 2023" -> "AJAN23"
+    palavras = re.findall(r'[A-Z]{2,}', relatorio_str)
+    if palavras and len(palavras[0]) >= 2:
+        primeira_palavra = palavras[0][:2]
+        
+        # Tenta extrair ano
+        anos = re.findall(r'\b(20\d{2})\b', relatorio_str)
+        if anos:
+            ano_short = anos[0][-2:]
+            return f"{primeira_palavra}{ano_short}"
+    
+    # Se não encontrou padrão, cria sigla baseada nas primeiras letras
+    palavras = relatorio_str.split()
+    if palavras:
+        # Pega primeira letra de cada palavra (até 3 palavras)
+        sigla = ''.join([p[0] for p in palavras[:3] if len(p) > 0])
+        if len(sigla) >= 2:
+            # Adiciona índice para garantir unicidade
+            return f"{sigla[:3]}{index:02d}"
+    
+    # Último recurso: usa as primeiras letras do relatório
+    if len(relatorio_str) >= 3:
+        return f"{relatorio_str[:3]}{index:02d}"
+    
+    # Se tudo falhar, usa o índice
+    return f"REL{index:03d}"
+
 def carregar_dados_da_planilha():
     planilha_path = 'base_auditoria.xlsx'
     if not os.path.exists(planilha_path):
@@ -380,9 +430,22 @@ def carregar_dados_da_planilha():
                     if coluna_relatorio:
                         print(f"  ✅ Coluna de Relatório encontrada: '{coluna_relatorio}'")
                         df['Relatorio'] = df[coluna_relatorio].astype(str)
+                        # Criar siglas para os relatórios
+                        print(f"  🔤 Criando siglas para os relatórios...")
+                        siglas = []
+                        for idx, relatorio in enumerate(df['Relatorio']):
+                            sigla = criar_sigla_relatorio(relatorio, idx)
+                            siglas.append(sigla)
+                        df['Sigla'] = siglas
+                        print(f"  ✅ Siglas criadas. Exemplos: {siglas[:10]}")
                     else:
                         print(f"  ⚠️ Coluna de Relatório não encontrada")
                         df['Relatorio'] = df.get('ID', 'Sem Relatório').astype(str)
+                        # Criar siglas padrão
+                        siglas = []
+                        for idx in range(len(df)):
+                            siglas.append(f"REL{idx:03d}")
+                        df['Sigla'] = siglas
                     
                     # 4. Garantir coluna Unidade
                     if 'Unidade' not in df.columns:
@@ -463,7 +526,7 @@ def obter_meses_disponiveis(df_checklist, ano_selecionado):
     return [{'label': f'{nomes_meses[m]}', 'value': m} for m in range(1, 13)]
 
 def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
-    """Cria matriz de risco com todos os meses do ano - NOMES VISÍVEIS"""
+    """Cria matriz de risco com todos os meses do ano - SIGLAS VISÍVEIS"""
     
     # Verificar se temos dados
     if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
@@ -492,6 +555,9 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
     print(f"  Unidades: {unidades}")
     print(f"  Total de registros: {len(df_risco_filtrado)}")
     
+    # Criar dicionário para mapear siglas para relatórios completos
+    mapeamento_siglas = {}
+    
     # Criar estrutura de dados para a matriz
     matriz_data = []
     
@@ -509,27 +575,17 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                 relatorios_info = []
                 for _, row in df_mes.iterrows():
                     relatorio = str(row.get('Relatorio', ''))
+                    sigla = str(row.get('Sigla', 'REL'))
                     status = str(row.get('Status', 'Sem Status'))
                     cores = get_status_color(status)
                     
-                    # Extrair número ou código do relatório
-                    # Tenta extrair números do relatório
-                    import re
-                    numeros = re.findall(r'\d+', relatorio)
-                    if numeros:
-                        codigo = numeros[0][:3]  # Pega os primeiros 3 dígitos
-                    else:
-                        # Se não tem números, pega as primeiras letras
-                        palavras = relatorio.split()
-                        if palavras:
-                            codigo = palavras[0][:3]
-                        else:
-                            codigo = "REL"
+                    # Armazenar mapeamento sigla -> relatório completo
+                    mapeamento_siglas[sigla] = relatorio
                     
-                    # Criar elemento com o código/nome visível
+                    # Criar elemento com a SIGLA visível
                     relatorio_item = html.Div([
                         html.Div(
-                            codigo.upper(),
+                            sigla,
                             style={
                                 'fontSize': '9px',
                                 'fontWeight': 'bold',
@@ -550,7 +606,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                             }
                         )
                     ],
-                    title=f"{relatorio}\nStatus: {status}\nMês: {nomes_completos[mes]}",
+                    title=f"Sigla: {sigla}\nRelatório: {relatorio}\nStatus: {status}\nMês: {nomes_completos[mes]}",
                     style={
                         'display': 'flex',
                         'flexDirection': 'column',
@@ -562,8 +618,8 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                         'borderRadius': '2px',
                         'border': f'1px solid {cores["border_color"]}',
                         'cursor': 'help',
-                        'minWidth': '35px',
-                        'maxWidth': '40px',
+                        'minWidth': '40px',
+                        'maxWidth': '45px',
                         'height': '35px'
                     })
                     relatorios_info.append(relatorio_item)
@@ -605,7 +661,10 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         
         matriz_data.append(linha)
     
-    # Criar tabela HTML com nomes visíveis
+    # Criar lista de siglas para legenda
+    siglas_unicas = sorted(set(mapeamento_siglas.keys()))
+    
+    # Criar tabela HTML com siglas visíveis
     tabela_cabecalho = [html.Th("UNIDADE", style={
         'backgroundColor': '#2c3e50',
         'color': 'white',
@@ -714,12 +773,77 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         }
     )
     
-    # Legenda melhorada
-    legenda = html.Div([
-        html.P("Legenda dos Relatórios:", style={'marginBottom': '5px', 'color': '#2c3e50', 'fontSize': '12px', 'fontWeight': 'bold'}),
+    # Criar legenda de siglas (agrupadas)
+    linhas_legenda = []
+    linha_atual = []
+    for i, sigla in enumerate(siglas_unicas):
+        relatorio_completo = mapeamento_siglas[sigla]
+        
+        item_legenda = html.Div([
+            html.Span(f"{sigla}: ", style={
+                'fontWeight': 'bold',
+                'color': '#2c3e50',
+                'fontSize': '10px',
+                'minWidth': '50px',
+                'display': 'inline-block'
+            }),
+            html.Span(relatorio_completo[:30] + ("..." if len(relatorio_completo) > 30 else ""), {
+                'color': '#7f8c8d',
+                'fontSize': '10px',
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis',
+                'whiteSpace': 'nowrap',
+                'maxWidth': '200px',
+                'display': 'inline-block'
+            })
+        ], style={
+            'display': 'flex',
+            'alignItems': 'center',
+            'marginBottom': '3px',
+            'padding': '2px 5px',
+            'borderBottom': '1px solid #f0f0f0'
+        })
+        
+        linha_atual.append(item_legenda)
+        
+        # Cada linha da legenda terá 2 colunas
+        if len(linha_atual) == 2 or i == len(siglas_unicas) - 1:
+            linhas_legenda.append(html.Div(
+                linha_atual,
+                style={'display': 'flex', 'justifyContent': 'space-between', 'gap': '10px', 'marginBottom': '5px'}
+            ))
+            linha_atual = []
+    
+    # Container da legenda com scroll
+    legenda_container = html.Div(
+        linhas_legenda,
+        style={
+            'maxHeight': '150px',
+            'overflowY': 'auto',
+            'padding': '5px',
+            'border': '1px solid #dee2e6',
+            'borderRadius': '3px',
+            'backgroundColor': '#f8f9fa',
+            'marginBottom': '10px'
+        }
+    )
+    
+    # Legenda completa
+    legenda_completa = html.Div([
+        html.P("📋 LEGENDA DE SIGLAS - MATRIZ DE RISCO", style={
+            'marginBottom': '5px', 
+            'color': '#2c3e50', 
+            'fontSize': '12px', 
+            'fontWeight': 'bold',
+            'display': 'flex',
+            'alignItems': 'center',
+            'gap': '5px'
+        }),
+        html.P(f"Total de {len(siglas_unicas)} relatórios encontrados", 
+               style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px'}),
         html.Div([
             html.Div([
-                html.Div("REL", style={
+                html.Div("A23001", style={
                     'fontSize': '9px',
                     'fontWeight': 'bold',
                     'color': '#c0392b',
@@ -728,14 +852,14 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     'borderRadius': '2px',
                     'border': '1px solid #c0392b',
                     'marginRight': '5px',
-                    'minWidth': '35px',
+                    'minWidth': '45px',
                     'textAlign': 'center'
                 }),
                 html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '10px'})
             ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '15px'}),
             
             html.Div([
-                html.Div("REL", style={
+                html.Div("R23002", style={
                     'fontSize': '9px',
                     'fontWeight': 'bold',
                     'color': '#f39c12',
@@ -744,14 +868,14 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     'borderRadius': '2px',
                     'border': '1px solid #f39c12',
                     'marginRight': '5px',
-                    'minWidth': '35px',
+                    'minWidth': '45px',
                     'textAlign': 'center'
                 }),
                 html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '10px'})
             ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '15px'}),
             
             html.Div([
-                html.Div("REL", style={
+                html.Div("A23003", style={
                     'fontSize': '9px',
                     'fontWeight': 'bold',
                     'color': '#27ae60',
@@ -760,28 +884,21 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     'borderRadius': '2px',
                     'border': '1px solid #27ae60',
                     'marginRight': '5px',
-                    'minWidth': '35px',
+                    'minWidth': '45px',
                     'textAlign': 'center'
                 }),
                 html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '10px'})
-            ], style={'display': 'flex', 'alignItems': 'center'}),
-            
-            html.Div([
-                html.Div("+2", style={
-                    'fontSize': '8px',
-                    'backgroundColor': '#e74c3c',
-                    'color': 'white',
-                    'padding': '1px 3px',
-                    'borderRadius': '2px',
-                    'marginRight': '5px',
-                    'fontWeight': 'bold'
-                }),
-                html.Span("Mais relatórios", style={'color': '#2c3e50', 'fontSize': '10px'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginLeft': '15px'})
-        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '10px', 'alignItems': 'center'})
+            ], style={'display': 'flex', 'alignItems': 'center'})
+        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '10px', 'alignItems': 'center', 'marginBottom': '10px'}),
+        
+        html.P("Lista Completa de Siglas:", style={'marginBottom': '5px', 'color': '#2c3e50', 'fontSize': '11px', 'fontWeight': 'bold'}),
+        legenda_container,
+        
+        html.P("ℹ️ Passe o mouse sobre as siglas na matriz para ver detalhes completos", 
+               style={'color': '#7f8c8d', 'marginTop': '8px', 'fontSize': '9px', 'fontStyle': 'italic'})
     ], style={
         'backgroundColor': '#f8f9fa',
-        'padding': '10px 12px',
+        'padding': '12px 15px',
         'borderRadius': '3px',
         'marginBottom': '12px',
         'border': '1px solid #dee2e6',
@@ -799,9 +916,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'alignItems': 'center',
             'gap': '8px'
         }),
-        html.P(f"Passe o mouse sobre os códigos para ver detalhes completos", 
-               style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '11px'}),
-        legenda,
+        legenda_completa,
         tabela_container
     ], style={
         'marginTop': '20px',
@@ -1367,7 +1482,9 @@ if __name__ == '__main__':
     print("📊 DASHBOARD OTIMIZADO:")
     print("  - ✅ Gráfico de pizza REMOVIDO")
     print("  - ✅ KPIs de PRAZOS para itens não conformes")
-    print("  - ✅ Matriz de risco COM NOMES VISÍVEIS")
+    print("  - ✅ Matriz de risco COM SIGLAS VISÍVEIS")
+    print("  - ✅ Legenda completa com lista de siglas")
+    print("  - ✅ Passe o mouse sobre as siglas para ver detalhes")
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
