@@ -137,7 +137,7 @@ def carregar_dados_da_planilha():
     try:
         print(f"📁 Carregando dados da planilha: {planilha_path}")
 
-        # CORREÇÃO CRÍTICA: Adicionado engine='openpyxl' e dtype=str para evitar erro "O valor deve ser numérico ou uma string contendo curinga"
+        # Leitura das planilhas
         df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', 
                                      engine='openpyxl', dtype=str)
         df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', 
@@ -154,23 +154,36 @@ def carregar_dados_da_planilha():
                 df = normalize_df_columns(df)
                 
                 # CORREÇÃO ESPECÍFICA PARA CADA ABA
-                if i == 0:  # df_checklist
+                if i == 0:  # df_checklist - CORREÇÃO CRÍTICA AQUI
                     print("📋 Processando CHECKLIST...")
                     
                     # Normalizar Status
                     if 'Status' in df.columns:
                         df['Status'] = df['Status'].astype(str).str.strip()
-                        print(f"  Status únicos antes: {df['Status'].unique()}")
+                        print(f"  Status únicos antes: {df['Status'].unique()[:10]}")
                         df['Status'] = df['Status'].apply(canonical_status)
-                        print(f"  Status únicos depois: {df['Status'].unique()}")
+                        print(f"  Status únicos depois: {df['Status'].unique()[:10]}")
                     
-                    # Processar datas
+                    # CORREÇÃO CRÍTICA: Processar datas corretamente
                     if 'Data' in df.columns:
-                        df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
+                        print(f"  Processando coluna Data...")
+                        
+                        # Converter a coluna Data para datetime CORRETAMENTE
+                        # Primeiro, tentar converter com dayfirst=True (formato brasileiro)
+                        df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
+                        
+                        # Verificar se alguma conversão falhou
+                        falhas = df['Data_DT'].isna().sum()
+                        if falhas > 0:
+                            print(f"  ⚠️ {falhas} datas não puderam ser convertidas com dayfirst=True")
+                            # Tentar sem dayfirst
+                            df.loc[df['Data_DT'].isna(), 'Data_DT'] = pd.to_datetime(
+                                df.loc[df['Data_DT'].isna(), 'Data'], errors='coerce'
+                            )
                         
                         # Extrair Ano e Mes como INTEIROS
-                        df['Ano'] = df['Data'].dt.year
-                        df['Mes'] = df['Data'].dt.month
+                        df['Ano'] = df['Data_DT'].dt.year
+                        df['Mes'] = df['Data_DT'].dt.month
                         
                         # Converter para inteiros explicitamente
                         df['Ano'] = df['Ano'].fillna(0).astype(int)
@@ -180,13 +193,31 @@ def carregar_dados_da_planilha():
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         
+                        # DEBUG: Mostrar distribuição de anos
+                        anos_distribuicao = df['Ano'].value_counts().sort_index()
+                        print(f"  📅 DISTRIBUIÇÃO DE ANOS:")
+                        for ano, contagem in anos_distribuicao.items():
+                            print(f"     {ano}: {contagem} registros")
+                        
+                        print(f"  Total de registros: {len(df)}")
                         print(f"  Ano (int) únicos: {df['Ano'].dropna().unique()}")
                         print(f"  Mês (int) únicos: {df['Mes'].dropna().unique()}")
                         
                         # Formatar data para exibição
-                        df['Data'] = df['Data'].apply(
+                        df['Data'] = df['Data_DT'].apply(
                             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
                         )
+                        
+                        # Remover coluna temporária
+                        df = df.drop(columns=['Data_DT'])
+                    
+                    # DEBUG: Contar Conformes por ano
+                    if 'Status' in df.columns and 'Ano' in df.columns:
+                        print(f"  📊 CONFORMES POR ANO:")
+                        for ano in sorted(df['Ano'].dropna().unique()):
+                            conformes_ano = len(df[(df['Ano'] == ano) & (df['Status'] == 'Conforme')])
+                            total_ano = len(df[df['Ano'] == ano])
+                            print(f"     Ano {ano}: {conformes_ano} conformes de {total_ano} total")
                 
                 elif i == 1:  # df_politicas
                     print("📑 Processando POLÍTICAS...")
@@ -195,50 +226,28 @@ def carregar_dados_da_planilha():
                 
                 elif i == 2:  # df_risco
                     print("🔄 Processando dados de RISCO...")
-                    print(f"  Colunas disponíveis no risco: {df.columns.tolist()}")
                     
                     # Normalizar Status
                     if 'Status' in df.columns:
                         df['Status'] = df['Status'].apply(canonical_status)
                     
-                    # Verificar se temos a coluna Data
+                    # Processar datas para a matriz
                     if 'Data' in df.columns:
-                        print(f"  ✅ Coluna 'Data' encontrada! Extraindo mês e ano...")
-                        
-                        # Converter a coluna Data para datetime (formato brasileiro dd/mm/aaaa)
                         df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
-                        
-                        # Extrair mês e ano como INTEIROS
                         df['Mes'] = df['Data_DT'].dt.month
                         df['Ano'] = df['Data_DT'].dt.year
                         
-                        # Converter para inteiros explicitamente
+                        # Converter para inteiros
                         df['Mes'] = df['Mes'].fillna(0).astype(int)
                         df['Ano'] = df['Ano'].fillna(0).astype(int)
-                        
-                        # Substituir 0 por NaN
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         
-                        # Criar Mes_Ano para exibição (ex: "06/2025")
-                        df['Mes_Ano'] = df.apply(
-                            lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
-                            if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
-                            else "Sem Data",
-                            axis=1
-                        )
-                        
-                        print(f"  ✅ Mês/Ano extraídos. Exemplos: {df['Mes_Ano'].unique()[:5]}")
-                        
-                        # Formatar a Data original para exibição
+                        # Formatar data
                         df['Data'] = df['Data_DT'].apply(
                             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
                         )
-                        
-                        # Remover coluna temporária
                         df = df.drop(columns=['Data_DT'])
-                    else:
-                        print("  ⚠️ Coluna 'Data' NÃO encontrada na aba Auditoria_Risco!")
                 
                 elif i == 3:  # df_melhorias
                     print("📈 Processando MELHORIAS...")
@@ -251,19 +260,12 @@ def carregar_dados_da_planilha():
                 elif i == 3: df_melhorias = df
 
         print("✅ Dados carregados da planilha com sucesso!")
-        print(f"  Checklist: {len(df_checklist)} registros")
-        print(f"  Risco: {len(df_risco)} registros")
-        if 'Mes' in df_risco.columns and 'Ano' in df_risco.columns:
-            print(f"  Risco - Meses únicos: {df_risco['Mes'].dropna().unique()}")
-            print(f"  Risco - Anos únicos: {df_risco['Ano'].dropna().unique()}")
-            print(f"  Risco - Mes_Ano únicos: {df_risco['Mes_Ano'].unique()}")
-        
         return df_checklist, df_politicas, df_risco, df_melhorias
 
     except Exception as e:
         print(f"❌ Erro ao carregar planilha: {e}")
         import traceback
-        traceback.print_exc()  # Mostra detalhes completos do erro
+        traceback.print_exc()
         return None, None, None, None
 
 # ========== FUNÇÕES UTILITÁRIAS ==========
@@ -1018,3 +1020,4 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
