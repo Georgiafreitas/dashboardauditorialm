@@ -152,15 +152,54 @@ def carregar_dados_da_planilha():
         for i, df in enumerate([df_checklist, df_politicas, df_risco, df_melhorias]):
             if df is not None:
                 df = normalize_df_columns(df)
-                if 'Status' in df.columns:
-                    print(f"DEBUG: Valores únicos de Status antes da normalização: {df['Status'].unique()}")
-                    df['Status'] = df['Status'].apply(canonical_status)
-                    print(f"DEBUG: Valores únicos de Status após normalização: {df['Status'].unique()}")
                 
-                # CORREÇÃO ESPECÍFICA PARA df_risco (índice 2) - EXTRAIR MÊS E ANO DA COLUNA Data
-                if i == 2:  # df_risco
+                # CORREÇÃO ESPECÍFICA PARA CADA ABA
+                if i == 0:  # df_checklist
+                    print("📋 Processando CHECKLIST...")
+                    
+                    # Normalizar Status
+                    if 'Status' in df.columns:
+                        df['Status'] = df['Status'].astype(str).str.strip()
+                        print(f"  Status únicos antes: {df['Status'].unique()}")
+                        df['Status'] = df['Status'].apply(canonical_status)
+                        print(f"  Status únicos depois: {df['Status'].unique()}")
+                    
+                    # Processar datas
+                    if 'Data' in df.columns:
+                        df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
+                        
+                        # Extrair Ano e Mes como INTEIROS
+                        df['Ano'] = df['Data'].dt.year
+                        df['Mes'] = df['Data'].dt.month
+                        
+                        # Converter para inteiros explicitamente
+                        df['Ano'] = df['Ano'].fillna(0).astype(int)
+                        df['Mes'] = df['Mes'].fillna(0).astype(int)
+                        
+                        # Substituir 0 por NaN
+                        df['Ano'] = df['Ano'].replace(0, pd.NA)
+                        df['Mes'] = df['Mes'].replace(0, pd.NA)
+                        
+                        print(f"  Ano (int) únicos: {df['Ano'].dropna().unique()}")
+                        print(f"  Mês (int) únicos: {df['Mes'].dropna().unique()}")
+                        
+                        # Formatar data para exibição
+                        df['Data'] = df['Data'].apply(
+                            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
+                        )
+                
+                elif i == 1:  # df_politicas
+                    print("📑 Processando POLÍTICAS...")
+                    if 'Status' in df.columns:
+                        df['Status'] = df['Status'].apply(canonical_status)
+                
+                elif i == 2:  # df_risco
                     print("🔄 Processando dados de RISCO...")
                     print(f"  Colunas disponíveis no risco: {df.columns.tolist()}")
+                    
+                    # Normalizar Status
+                    if 'Status' in df.columns:
+                        df['Status'] = df['Status'].apply(canonical_status)
                     
                     # Verificar se temos a coluna Data
                     if 'Data' in df.columns:
@@ -169,9 +208,17 @@ def carregar_dados_da_planilha():
                         # Converter a coluna Data para datetime (formato brasileiro dd/mm/aaaa)
                         df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
                         
-                        # Extrair mês e ano
+                        # Extrair mês e ano como INTEIROS
                         df['Mes'] = df['Data_DT'].dt.month
                         df['Ano'] = df['Data_DT'].dt.year
+                        
+                        # Converter para inteiros explicitamente
+                        df['Mes'] = df['Mes'].fillna(0).astype(int)
+                        df['Ano'] = df['Ano'].fillna(0).astype(int)
+                        
+                        # Substituir 0 por NaN
+                        df['Mes'] = df['Mes'].replace(0, pd.NA)
+                        df['Ano'] = df['Ano'].replace(0, pd.NA)
                         
                         # Criar Mes_Ano para exibição (ex: "06/2025")
                         df['Mes_Ano'] = df.apply(
@@ -192,31 +239,11 @@ def carregar_dados_da_planilha():
                         df = df.drop(columns=['Data_DT'])
                     else:
                         print("  ⚠️ Coluna 'Data' NÃO encontrada na aba Auditoria_Risco!")
-                        print(f"  Colunas disponíveis: {df.columns.tolist()}")
-                        # Tentar encontrar coluna similar
-                        colunas_similares = [col for col in df.columns if 'data' in col.lower() or 'date' in col.lower()]
-                        if colunas_similares:
-                            print(f"  Colunas similares encontradas: {colunas_similares}")
                 
-                # Para outras abas (checklist e melhorias)
-                else:
-                    # Normalizar datas para checklist e melhorias, se houver
-                    if 'Data' in df.columns:
-                        df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
-                        df['Ano'] = df['Data'].dt.year
-                        df['Mes'] = df['Data'].dt.month
-                        df['Mes_Ano'] = df['Data'].dt.strftime('%m/%Y')
-                        
-                        # CORREÇÃO: Formata datas no padrão brasileiro dd/mm/aaaa
-                        try:
-                            # Converte para formato brasileiro dd/mm/aaaa
-                            df['Data'] = df['Data'].apply(
-                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
-                            )
-                        except Exception as e:
-                            print(f"⚠️ Aviso ao formatar Data: {e}")
-                            # Mantém a data como string se não conseguir converter
-                            df['Data'] = df['Data'].astype(str)
+                elif i == 3:  # df_melhorias
+                    print("📈 Processando MELHORIAS...")
+                    if 'Status' in df.columns:
+                        df['Status'] = df['Status'].apply(canonical_status)
                 
                 if i == 0: df_checklist = df
                 elif i == 1: df_politicas = df
@@ -225,10 +252,10 @@ def carregar_dados_da_planilha():
 
         print("✅ Dados carregados da planilha com sucesso!")
         print(f"  Checklist: {len(df_checklist)} registros")
-        print(f"  Risco: {len(df_risco)} registros | Colunas: {df_risco.columns.tolist()}")
+        print(f"  Risco: {len(df_risco)} registros")
         if 'Mes' in df_risco.columns and 'Ano' in df_risco.columns:
-            print(f"  Risco - Meses únicos: {df_risco['Mes'].unique()}")
-            print(f"  Risco - Anos únicos: {df_risco['Ano'].unique()}")
+            print(f"  Risco - Meses únicos: {df_risco['Mes'].dropna().unique()}")
+            print(f"  Risco - Anos únicos: {df_risco['Ano'].dropna().unique()}")
             print(f"  Risco - Mes_Ano únicos: {df_risco['Mes_Ano'].unique()}")
         
         return df_checklist, df_politicas, df_risco, df_melhorias
@@ -347,52 +374,84 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     # ---------- FILTRAR CHECKLIST ----------
     df = df_checklist.copy()
     
-    # CORREÇÃO: Converter filtros para os tipos corretos
+    # CORREÇÃO CRÍTICA: Converter colunas para tipos consistentes antes de filtrar
+    print(f"🔍 DEBUG FILTROS: Ano='{ano}', Mês='{mes}', Unidade='{unidade}'")
+    
+    # Converter colunas numéricas para o tipo correto
+    if 'Ano' in df.columns:
+        df['Ano'] = pd.to_numeric(df['Ano'], errors='coerce')
+        print(f"  Ano - Valores únicos: {df['Ano'].dropna().unique()}")
+    
+    if 'Mes' in df.columns:
+        df['Mes'] = pd.to_numeric(df['Mes'], errors='coerce')
+        print(f"  Mês - Valores únicos: {df['Mes'].dropna().unique()}")
+    
+    # Aplicar filtros com CONVERSÃO CORRETA
+    total_antes = len(df)
+    
     if ano != 'todos':
         try:
-            ano_int = int(ano)
-            # Converter coluna Ano para inteiro para comparação
-            df['Ano'] = pd.to_numeric(df['Ano'], errors='coerce')
-            df = df[df['Ano'] == ano_int]
-        except:
-            print(f"⚠️ Erro ao filtrar por ano: {ano}")
+            ano_filtro = int(ano)
+            df = df[df['Ano'] == ano_filtro]
+            print(f"  ✅ Filtro ANO aplicado: {ano_filtro} | Registros: {len(df)}/{total_antes}")
+        except Exception as e:
+            print(f"  ❌ Erro ao filtrar por ano '{ano}': {e}")
+            # Mostrar exemplos para debug
+            if 'Ano' in df.columns:
+                print(f"    Exemplos de valores na coluna Ano: {df['Ano'].head(10).tolist()}")
     
     if mes != 'todos':
         try:
-            mes_int = int(mes)
-            # Converter coluna Mes para inteiro para comparação
-            df['Mes'] = pd.to_numeric(df['Mes'], errors='coerce')
-            df = df[df['Mes'] == mes_int]
-        except:
-            print(f"⚠️ Erro ao filtrar por mês: {mes}")
+            mes_filtro = int(mes)
+            df = df[df['Mes'] == mes_filtro]
+            print(f"  ✅ Filtro MÊS aplicado: {mes_filtro} | Registros: {len(df)}")
+        except Exception as e:
+            print(f"  ❌ Erro ao filtrar por mês '{mes}': {e}")
+            if 'Mes' in df.columns:
+                print(f"    Exemplos de valores na coluna Mes: {df['Mes'].head(10).tolist()}")
     
     if unidade != 'todas':
         try:
-            df = df[df['Unidade'] == unidade]
-        except:
-            print(f"⚠️ Erro ao filtrar por unidade: {unidade}")
-
+            # Converter unidade para string para comparação
+            df['Unidade'] = df['Unidade'].astype(str).str.strip()
+            df = df[df['Unidade'] == unidade.strip()]
+            print(f"  ✅ Filtro UNIDADE aplicado: '{unidade}' | Registros: {len(df)}")
+        except Exception as e:
+            print(f"  ❌ Erro ao filtrar por unidade '{unidade}': {e}")
+            if 'Unidade' in df.columns:
+                print(f"    Exemplos de valores na coluna Unidade: {df['Unidade'].head(10).tolist()}")
+    
     total = len(df)
-    print(f"DEBUG: Total de registros após filtros: {total}")
-    print(f"DEBUG: Filtros aplicados - Ano: {ano}, Mês: {mes}, Unidade: {unidade}")
-
+    print(f"📊 TOTAL APÓS FILTROS: {total} registros")
+    
     # ---------- Contagem correta dos status ----------
-    # CORREÇÃO: Contagem mais robusta
     if total > 0:
-        # Converter para string e remover espaços
-        status_series = df['Status'].astype(str).str.strip()
+        # CORREÇÃO: Garantir que Status seja string e remover espaços
+        df['Status'] = df['Status'].astype(str).str.strip()
         
-        conforme = len(df[status_series == 'Conforme'])
-        parcial = len(df[status_series == 'Conforme Parcialmente'])
-        nao = len(df[status_series == 'Não Conforme'])
+        # Contagem DIRETA e precisa
+        conforme = len(df[df['Status'].str.lower() == 'conforme'])
+        parcial = len(df[df['Status'].str.lower().str.contains('parcial')])
+        nao = len(df[df['Status'].str.lower().str.contains('não|nao')])
         
-        print(f"DEBUG Contagem: Conforme={conforme}, Parcial={parcial}, Não={nao}, Total={total}")
+        # Debug detalhado
+        print(f"🔢 CONTAGEM STATUS:")
+        print(f"   Total registros: {total}")
+        print(f"   Conforme: {conforme} (query: Status == 'Conforme')")
+        print(f"   Parcial: {parcial} (query: Status contém 'parcial')")
+        print(f"   Não Conforme: {nao} (query: Status contém 'não|nao')")
         
-        # Verificação de debug
+        # Verificar se há outros status
+        outros_status = df[~df['Status'].str.lower().str.contains('conforme|parcial|não|nao')]['Status'].unique()
+        if len(outros_status) > 0:
+            print(f"   ⚠️ Outros status encontrados: {outros_status}")
+            
+        # Soma para verificação
         soma = conforme + parcial + nao
         if soma != total:
-            print(f"⚠️ Aviso: Contagem de status não bate! Soma={soma}, Total={total}")
-            print(f"DEBUG: Valores únicos de Status: {status_series.unique()}")
+            print(f"   ⚠️ ATENÇÃO: Soma ({soma}) ≠ Total ({total})")
+            print(f"   Diferença: {total - soma} registros")
+            print(f"   Valores únicos de Status: {df['Status'].unique()}")
     else:
         conforme = 0
         parcial = 0
@@ -637,49 +696,45 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             try:
                 ano_int = int(ano)
                 df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
+                print(f"  ✅ Matriz - Filtro ANO aplicado: {ano_int}")
             except:
-                print(f"⚠️ Erro ao filtrar matriz por ano: {ano}")
+                print(f"  ⚠️ Erro ao filtrar matriz por ano: {ano}")
         
         if mes != 'todos' and 'Mes' in df_risco_filtrado.columns:
             try:
                 mes_int = int(mes)
                 df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == mes_int]
+                print(f"  ✅ Matriz - Filtro MÊS aplicado: {mes_int}")
             except:
-                print(f"⚠️ Erro ao filtrar matriz por mês: {mes}")
+                print(f"  ⚠️ Erro ao filtrar matriz por mês: {mes}")
         
         if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
             df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
+            print(f"  ✅ Matriz - Filtro UNIDADE aplicado: '{unidade}'")
 
         # CORREÇÃO: Criar Mes_Ano de forma robusta - VERIFICAR SE TEM DADOS
-        print(f"DEBUG Matriz: {len(df_risco_filtrado)} registros após filtros")
-        print(f"DEBUG Matriz colunas: {df_risco_filtrado.columns.tolist()}")
+        print(f"📋 Matriz: {len(df_risco_filtrado)} registros após filtros")
         
         if len(df_risco_filtrado) > 0:
             # Garantir que temos Ano e Mes
             if 'Ano' not in df_risco_filtrado.columns or 'Mes' not in df_risco_filtrado.columns:
                 print("⚠️ Matriz: Colunas Ano ou Mes não encontradas")
-                # Tentar extrair de uma coluna de data
-                colunas_data = [col for col in df_risco_filtrado.columns if 'data' in col.lower()]
-                if colunas_data:
-                    data_col = colunas_data[0]
-                    df_risco_filtrado['Data'] = pd.to_datetime(df_risco_filtrado[data_col], errors='coerce')
-                    df_risco_filtrado['Ano'] = df_risco_filtrado['Data'].dt.year
-                    df_risco_filtrado['Mes'] = df_risco_filtrado['Data'].dt.month
             
-            # Criar Mes_Ano
-            df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
-                lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
-                if pd.notna(row['Mes']) and pd.notna(row['Ano']) and row['Mes'] != 0 and row['Ano'] != 0
-                else "Sem Data", 
-                axis=1
-            )
+            # Criar Mes_Ano se não existir
+            if 'Mes_Ano' not in df_risco_filtrado.columns:
+                df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
+                    lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
+                    if pd.notna(row['Mes']) and pd.notna(row['Ano']) and row['Mes'] != 0 and row['Ano'] != 0
+                    else "Sem Data", 
+                    axis=1
+                )
             
             # Agrupar dados por Unidade e Mes_Ano
             unidades = sorted(df_risco_filtrado['Unidade'].dropna().unique())
             meses_anos = sorted(df_risco_filtrado['Mes_Ano'].dropna().unique())
             
-            print(f"DEBUG Matriz: {len(unidades)} unidades, {len(meses_anos)} meses_anos")
-            print(f"DEBUG Meses_Anos: {meses_anos}")
+            print(f"📊 Matriz: {len(unidades)} unidades, {len(meses_anos)} meses_anos")
+            print(f"📅 Meses_Anos: {meses_anos}")
             
             # Criar estrutura de dados para a matriz
             matriz_data = []
@@ -963,5 +1018,3 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
-
