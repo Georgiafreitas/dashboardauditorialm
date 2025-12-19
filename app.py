@@ -5,6 +5,7 @@ import os
 import unicodedata
 from datetime import datetime
 import dash_auth  # Importação para autenticação
+import re
 
 print("🚀 Iniciando Dashboard de Auditoria...")
 
@@ -128,6 +129,41 @@ def formatar_data(data_str):
         print(f"Erro ao formatar data '{data_str}': {e}")
         return str(data_str)
 
+def extrair_mes_ano_da_data(data_str):
+    """Extrai mês e ano de uma string de data"""
+    if pd.isna(data_str) or str(data_str) in ['', 'nan', 'NaT', 'None']:
+        return None, None
+    
+    try:
+        # Converter para datetime
+        data_dt = pd.to_datetime(data_str, dayfirst=True, errors='coerce')
+        if pd.notna(data_dt):
+            return data_dt.month, data_dt.year
+        
+        # Tentar padrões comuns
+        data_str_clean = str(data_str).strip()
+        
+        # Padrão dd/mm/aaaa
+        match = re.match(r'(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})', data_str_clean)
+        if match:
+            dia, mes, ano = match.groups()
+            mes = int(mes)
+            ano = int(ano) if len(ano) == 4 else 2000 + int(ano)
+            return mes, ano
+        
+        # Padrão mm/aaaa
+        match = re.match(r'(\d{1,2})[/-](\d{2,4})', data_str_clean)
+        if match:
+            mes, ano = match.groups()
+            mes = int(mes)
+            ano = int(ano) if len(ano) == 4 else 2000 + int(ano)
+            return mes, ano
+        
+    except Exception as e:
+        print(f"Erro ao extrair mês/ano de '{data_str}': {e}")
+    
+    return None, None
+
 def carregar_dados_da_planilha():
     planilha_path = 'base_auditoria.xlsx'
     if not os.path.exists(planilha_path):
@@ -137,15 +173,15 @@ def carregar_dados_da_planilha():
     try:
         print(f"📁 Carregando dados da planilha: {planilha_path}")
 
-        # Leitura das planilhas
+        # Leitura das planilhas - SEM dtype=str para permitir conversão correta
         df_checklist = pd.read_excel(planilha_path, sheet_name='Checklist_Unidades', 
-                                     engine='openpyxl', dtype=str)
+                                     engine='openpyxl')
         df_politicas = pd.read_excel(planilha_path, sheet_name='Politicas', 
-                                     engine='openpyxl', dtype=str)
+                                     engine='openpyxl')
         df_risco = pd.read_excel(planilha_path, sheet_name='Auditoria_Risco', 
-                                 engine='openpyxl', dtype=str)
+                                 engine='openpyxl')
         df_melhorias = pd.read_excel(planilha_path, sheet_name='Melhorias_Logistica', 
-                                     engine='openpyxl', dtype=str)
+                                     engine='openpyxl')
 
         print("✅ Leitura inicial da planilha concluída. Processando dados...")
 
@@ -159,7 +195,7 @@ def carregar_dados_da_planilha():
                 print(f"Colunas após normalização: {df.columns.tolist()}")
                 
                 # CORREÇÃO ESPECÍFICA PARA CADA ABA
-                if i == 0:  # df_checklist - CORREÇÃO CRÍTICA AQUI
+                if i == 0:  # df_checklist
                     print("📋 Processando CHECKLIST...")
                     
                     # Normalizar Status
@@ -169,60 +205,35 @@ def carregar_dados_da_planilha():
                         df['Status'] = df['Status'].apply(canonical_status)
                         print(f"  Status únicos depois: {df['Status'].unique()[:10]}")
                     
-                    # CORREÇÃO CRÍTICA: Processar datas corretamente
+                    # Processar datas
                     if 'Data' in df.columns:
                         print(f"  Processando coluna Data...")
                         
-                        # Converter a coluna Data para datetime CORRETAMENTE
-                        # Primeiro, tentar converter com dayfirst=True (formato brasileiro)
+                        # Converter a coluna Data para datetime
                         df['Data_DT'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True)
                         
-                        # Verificar se alguma conversão falhou
                         falhas = df['Data_DT'].isna().sum()
                         if falhas > 0:
-                            print(f"  ⚠️ {falhas} datas não puderam ser convertidas com dayfirst=True")
-                            # Tentar sem dayfirst
-                            df.loc[df['Data_DT'].isna(), 'Data_DT'] = pd.to_datetime(
-                                df.loc[df['Data_DT'].isna(), 'Data'], errors='coerce'
-                            )
+                            print(f"  ⚠️ {falhas} datas não puderam ser convertidas")
                         
-                        # Extrair Ano e Mes como INTEIROS
+                        # Extrair Ano e Mes
                         df['Ano'] = df['Data_DT'].dt.year
                         df['Mes'] = df['Data_DT'].dt.month
                         
-                        # Converter para inteiros explicitamente
                         df['Ano'] = df['Ano'].fillna(0).astype(int)
                         df['Mes'] = df['Mes'].fillna(0).astype(int)
-                        
-                        # Substituir 0 por NaN
                         df['Ano'] = df['Ano'].replace(0, pd.NA)
                         df['Mes'] = df['Mes'].replace(0, pd.NA)
                         
-                        # DEBUG: Mostrar distribuição de anos
-                        anos_distribuicao = df['Ano'].value_counts().sort_index()
-                        print(f"  📅 DISTRIBUIÇÃO DE ANOS:")
-                        for ano, contagem in anos_distribuicao.items():
-                            print(f"     {ano}: {contagem} registros")
-                        
                         print(f"  Total de registros: {len(df)}")
-                        print(f"  Ano (int) únicos: {df['Ano'].dropna().unique()}")
-                        print(f"  Mês (int) únicos: {df['Mes'].dropna().unique()}")
+                        print(f"  Ano únicos: {df['Ano'].dropna().unique()}")
+                        print(f"  Mês únicos: {df['Mes'].dropna().unique()}")
                         
-                        # Formatar data para exibição
                         df['Data'] = df['Data_DT'].apply(
                             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
                         )
                         
-                        # Remover coluna temporária
                         df = df.drop(columns=['Data_DT'])
-                    
-                    # DEBUG: Contar Conformes por ano
-                    if 'Status' in df.columns and 'Ano' in df.columns:
-                        print(f"  📊 CONFORMES POR ANO:")
-                        for ano in sorted(df['Ano'].dropna().unique()):
-                            conformes_ano = len(df[(df['Ano'] == ano) & (df['Status'] == 'Conforme')])
-                            total_ano = len(df[df['Ano'] == ano])
-                            print(f"     Ano {ano}: {conformes_ano} conformes de {total_ano} total")
                 
                 elif i == 1:  # df_politicas
                     print("📑 Processando POLÍTICAS...")
@@ -231,11 +242,16 @@ def carregar_dados_da_planilha():
                 
                 elif i == 2:  # df_risco - CORREÇÃO COMPLETA AQUI
                     print("🔄 Processando dados de RISCO...")
-                    
-                    # DEBUG: Verificar todas as colunas
                     print(f"  🔍 Colunas disponíveis: {df.columns.tolist()}")
+                    print(f"  📊 Total de registros: {len(df)}")
                     
-                    # CORREÇÃO: Encontrar coluna de Status (pode ser 'Status' ou outra variação)
+                    # Verificar uma amostra dos dados
+                    if len(df) > 0:
+                        print(f"  📋 Amostra dos dados (primeiras 3 linhas):")
+                        for j in range(min(3, len(df))):
+                            print(f"    Linha {j+1}: {df.iloc[j].to_dict()}")
+                    
+                    # 1. Encontrar e processar coluna de Status
                     coluna_status = None
                     for col in df.columns:
                         if 'status' in col.lower():
@@ -244,13 +260,15 @@ def carregar_dados_da_planilha():
                     
                     if coluna_status:
                         print(f"  ✅ Coluna de Status encontrada: '{coluna_status}'")
+                        # Converter para string antes de processar
+                        df[coluna_status] = df[coluna_status].astype(str).str.strip()
                         df['Status'] = df[coluna_status].apply(canonical_status)
                         print(f"  Status únicos: {df['Status'].unique()[:10]}")
                     else:
-                        print(f"  ⚠️ Coluna de Status não encontrada, criando coluna padrão")
+                        print(f"  ⚠️ Coluna de Status não encontrada")
                         df['Status'] = "Não Iniciado"
                     
-                    # CORREÇÃO: Encontrar coluna de Data
+                    # 2. Encontrar e processar coluna de Data - CORREÇÃO CRÍTICA
                     coluna_data = None
                     for col in df.columns:
                         if col.lower() == 'data':
@@ -258,32 +276,56 @@ def carregar_dados_da_planilha():
                             break
                     
                     if coluna_data:
-                        print(f"  ✅ Coluna de Data encontrada: '{coluna_data}'")
-                        print(f"  Amostra de 5 datas brutas: {df[coluna_data].head(5).tolist()}")
+                        print(f"\n  ✅ Coluna de Data encontrada: '{coluna_data}'")
+                        print(f"  Amostra de 10 datas brutas:")
+                        datas_amostra = df[coluna_data].head(10).tolist()
+                        for j, data in enumerate(datas_amostra):
+                            print(f"    {j+1:2d}. '{data}' (tipo: {type(data)})")
                         
-                        # Converter datas para datetime CORRETAMENTE
-                        df['Data_DT'] = pd.to_datetime(
-                            df[coluna_data], 
-                            dayfirst=True,  # Formato brasileiro dd/mm/aaaa
-                            errors='coerce'
-                        )
+                        # Tentar extrair mês e ano diretamente
+                        print(f"\n  🔍 Extraindo mês e ano das datas...")
                         
-                        # Verificar conversão
+                        # Criar listas para mês e ano
+                        meses = []
+                        anos = []
+                        
+                        for idx, data_val in df[coluna_data].items():
+                            if pd.isna(data_val):
+                                meses.append(pd.NA)
+                                anos.append(pd.NA)
+                                continue
+                            
+                            mes, ano = extrair_mes_ano_da_data(str(data_val))
+                            if mes and ano:
+                                meses.append(mes)
+                                anos.append(ano)
+                            else:
+                                # Tentar converter para datetime
+                                try:
+                                    data_dt = pd.to_datetime(data_val, dayfirst=True, errors='coerce')
+                                    if pd.notna(data_dt):
+                                        meses.append(data_dt.month)
+                                        anos.append(data_dt.year)
+                                    else:
+                                        meses.append(pd.NA)
+                                        anos.append(pd.NA)
+                                except:
+                                    meses.append(pd.NA)
+                                    anos.append(pd.NA)
+                        
+                        df['Mes'] = meses
+                        df['Ano'] = anos
+                        
+                        # Contar sucessos
+                        sucesso_mes = sum(1 for m in meses if pd.notna(m))
+                        sucesso_ano = sum(1 for a in anos if pd.notna(a))
                         total = len(df)
-                        sucesso = df['Data_DT'].notna().sum()
-                        print(f"  ✅ Conversão de datas: {sucesso}/{total} bem-sucedidas")
                         
-                        # Extrair mês e ano
-                        df['Mes'] = df['Data_DT'].dt.month
-                        df['Ano'] = df['Data_DT'].dt.year
+                        print(f"  ✅ Extração de mês/ano:")
+                        print(f"     Mês extraído: {sucesso_mes}/{total} ({sucesso_mes/total*100:.1f}%)")
+                        print(f"     Ano extraído: {sucesso_ano}/{total} ({sucesso_ano/total*100:.1f}%)")
                         
-                        # Converter para inteiros
-                        df['Mes'] = df['Mes'].fillna(0).astype(int)
-                        df['Ano'] = df['Ano'].fillna(0).astype(int)
-                        df['Mes'] = df['Mes'].replace(0, pd.NA)
-                        df['Ano'] = df['Ano'].replace(0, pd.NA)
-                        
-                        # Criar Mes_Ano para agrupamento
+                        # Criar Mes_Ano
                         df['Mes_Ano'] = df.apply(
                             lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
                             if pd.notna(row['Mes']) and pd.notna(row['Ano']) 
@@ -291,28 +333,22 @@ def carregar_dados_da_planilha():
                             axis=1
                         )
                         
-                        # Formatar data para exibição
-                        df['Data'] = df['Data_DT'].apply(
-                            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else ''
-                        )
-                        
-                        # DEBUG: Mostrar distribuição
-                        print(f"  📊 DISTRIBUIÇÃO DE MES_ANO:")
+                        # Mostrar distribuição de Mes_Ano
+                        print(f"\n  📊 DISTRIBUIÇÃO DE MES_ANO:")
                         distribuicao = df['Mes_Ano'].value_counts().sort_index()
                         for mes_ano, contagem in distribuicao.items():
                             print(f"     {mes_ano}: {contagem} registros")
                         
-                        # Remover coluna temporária
-                        df = df.drop(columns=['Data_DT'])
+                        # Formatar data original para exibição
+                        df['Data_Formatada'] = df[coluna_data].apply(formatar_data)
                     else:
-                        print(f"  ⚠️ Coluna de Data não encontrada")
-                        # Criar colunas vazias para não quebrar o código
+                        print(f"  ❌ Coluna de Data não encontrada!")
                         df['Mes'] = pd.NA
                         df['Ano'] = pd.NA
                         df['Mes_Ano'] = "Sem Data"
-                        df['Data'] = ""
+                        df['Data_Formatada'] = ""
                     
-                    # CORREÇÃO: Encontrar coluna de Relatório
+                    # 3. Encontrar coluna de Relatório
                     coluna_relatorio = None
                     for col in df.columns:
                         if 'relatorio' in col.lower():
@@ -321,18 +357,21 @@ def carregar_dados_da_planilha():
                     
                     if coluna_relatorio:
                         print(f"  ✅ Coluna de Relatório encontrada: '{coluna_relatorio}'")
-                        df['Relatorio'] = df[coluna_relatorio]
+                        df['Relatorio'] = df[coluna_relatorio].astype(str)
                     else:
-                        print(f"  ⚠️ Coluna de Relatório não encontrada, usando ID")
-                        df['Relatorio'] = df.get('ID', 'Sem Relatório')
+                        print(f"  ⚠️ Coluna de Relatório não encontrada")
+                        df['Relatorio'] = df.get('ID', 'Sem Relatório').astype(str)
                     
-                    # CORREÇÃO: Encontrar coluna de Unidade
+                    # 4. Garantir coluna Unidade
                     if 'Unidade' not in df.columns:
                         for col in df.columns:
                             if 'unidade' in col.lower():
-                                df['Unidade'] = df[col]
+                                df['Unidade'] = df[col].astype(str)
                                 print(f"  ✅ Coluna Unidade mapeada de: '{col}'")
                                 break
+                        else:
+                            print(f"  ⚠️ Coluna Unidade não encontrada, criando padrão")
+                            df['Unidade'] = "Sem Unidade"
                 
                 elif i == 3:  # df_melhorias
                     print("📈 Processando MELHORIAS...")
@@ -350,7 +389,6 @@ def carregar_dados_da_planilha():
         print("✅ Dados carregados da planilha com sucesso!")
         print("="*50)
         
-        # Verificação final dos dados
         print(f"\n📊 RESUMO DOS DADOS CARREGADOS:")
         print(f"  Checklist: {len(df_checklist)} registros")
         print(f"  Políticas: {len(df_politicas)} registros")
@@ -361,7 +399,7 @@ def carregar_dados_da_planilha():
             print(f"\n📋 DETALHES DA MATRIZ DE RISCO:")
             print(f"  Colunas: {df_risco.columns.tolist()}")
             if 'Mes_Ano' in df_risco.columns:
-                print(f"  Períodos únicos: {sorted(df_risco['Mes_Ano'].dropna().unique())}")
+                print(f"  Períodos únicos encontrados: {sorted(df_risco['Mes_Ano'].dropna().unique())}")
         
         return df_checklist, df_politicas, df_risco, df_melhorias
 
@@ -375,9 +413,7 @@ def carregar_dados_da_planilha():
 def obter_anos_disponiveis(df_checklist):
     if df_checklist is None or 'Ano' not in df_checklist.columns:
         return []
-    # CORREÇÃO: Remover .0 e converter para inteiro
     anos = sorted(df_checklist['Ano'].dropna().unique(), reverse=True)
-    # Converter para inteiro e remover duplicados
     anos_int = []
     for ano in anos:
         try:
@@ -479,19 +515,14 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     # ---------- FILTRAR CHECKLIST ----------
     df = df_checklist.copy()
     
-    # CORREÇÃO CRÍTICA: Converter colunas para tipos consistentes antes de filtrar
     print(f"\n🔍 DEBUG FILTROS: Ano='{ano}', Mês='{mes}', Unidade='{unidade}'")
     
-    # Converter colunas numéricas para o tipo correto
     if 'Ano' in df.columns:
         df['Ano'] = pd.to_numeric(df['Ano'], errors='coerce')
-        print(f"  Ano - Valores únicos: {df['Ano'].dropna().unique()}")
     
     if 'Mes' in df.columns:
         df['Mes'] = pd.to_numeric(df['Mes'], errors='coerce')
-        print(f"  Mês - Valores únicos: {df['Mes'].dropna().unique()}")
     
-    # Aplicar filtros com CONVERSÃO CORRETA
     total_antes = len(df)
     
     if ano != 'todos':
@@ -501,9 +532,6 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             print(f"  ✅ Filtro ANO aplicado: {ano_filtro} | Registros: {len(df)}/{total_antes}")
         except Exception as e:
             print(f"  ❌ Erro ao filtrar por ano '{ano}': {e}")
-            # Mostrar exemplos para debug
-            if 'Ano' in df.columns:
-                print(f"    Exemplos de valores na coluna Ano: {df['Ano'].head(10).tolist()}")
     
     if mes != 'todos':
         try:
@@ -512,51 +540,24 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             print(f"  ✅ Filtro MÊS aplicado: {mes_filtro} | Registros: {len(df)}")
         except Exception as e:
             print(f"  ❌ Erro ao filtrar por mês '{mes}': {e}")
-            if 'Mes' in df.columns:
-                print(f"    Exemplos de valores na coluna Mes: {df['Mes'].head(10).tolist()}")
     
     if unidade != 'todas':
         try:
-            # Converter unidade para string para comparação
             df['Unidade'] = df['Unidade'].astype(str).str.strip()
             df = df[df['Unidade'] == unidade.strip()]
             print(f"  ✅ Filtro UNIDADE aplicado: '{unidade}' | Registros: {len(df)}")
         except Exception as e:
             print(f"  ❌ Erro ao filtrar por unidade '{unidade}': {e}")
-            if 'Unidade' in df.columns:
-                print(f"    Exemplos de valores na coluna Unidade: {df['Unidade'].head(10).tolist()}")
     
     total = len(df)
     print(f"📊 TOTAL APÓS FILTROS: {total} registros")
     
     # ---------- Contagem correta dos status ----------
     if total > 0:
-        # CORREÇÃO: Garantir que Status seja string e remover espaços
         df['Status'] = df['Status'].astype(str).str.strip()
-        
-        # Contagem DIRETA e precisa
         conforme = len(df[df['Status'].str.lower() == 'conforme'])
         parcial = len(df[df['Status'].str.lower().str.contains('parcial')])
         nao = len(df[df['Status'].str.lower().str.contains('não|nao')])
-        
-        # Debug detalhado
-        print(f"🔢 CONTAGEM STATUS:")
-        print(f"   Total registros: {total}")
-        print(f"   Conforme: {conforme} (query: Status == 'Conforme')")
-        print(f"   Parcial: {parcial} (query: Status contém 'parcial')")
-        print(f"   Não Conforme: {nao} (query: Status contém 'não|nao')")
-        
-        # Verificar se há outros status
-        outros_status = df[~df['Status'].str.lower().str.contains('conforme|parcial|não|nao')]['Status'].unique()
-        if len(outros_status) > 0:
-            print(f"   ⚠️ Outros status encontrados: {outros_status}")
-            
-        # Soma para verificação
-        soma = conforme + parcial + nao
-        if soma != total:
-            print(f"   ⚠️ ATENÇÃO: Soma ({soma}) ≠ Total ({total})")
-            print(f"   Diferença: {total - soma} registros")
-            print(f"   Valores únicos de Status: {df['Status'].unique()}")
     else:
         conforme = 0
         parcial = 0
@@ -599,167 +600,13 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     df_nao_conforme = df[df['Status']=='Não Conforme']
     
     if len(df_nao_conforme) > 0:
-        # Verificar se as colunas de prazo e data de finalização existem
-        colunas_disponiveis = df_nao_conforme.columns.tolist()
-        
-        # Normalizar nomes de colunas para busca case-insensitive
-        colunas_lower = [str(col).lower() for col in colunas_disponiveis]
-        
-        # Procurar colunas de prazo e data de finalização
-        coluna_prazo = None
-        coluna_finalizacao = None
-        
-        # Possíveis nomes para coluna de prazo
-        possiveis_prazos = ['prazo', 'data_limite', 'data_prazo', 'prazo_final', 'limite']
-        for prazo_nome in possiveis_prazos:
-            for idx, col_lower in enumerate(colunas_lower):
-                if prazo_nome in col_lower:
-                    coluna_prazo = colunas_disponiveis[idx]
-                    break
-            if coluna_prazo:
-                break
-        
-        # Possíveis nomes para coluna de data de finalização
-        possiveis_finalizacoes = ['data_finalizacao', 'data_conclusao', 'finalizacao', 'conclusao', 
-                                  'data_encerramento', 'data_termino', 'finalizado_em']
-        for final_nome in possiveis_finalizacoes:
-            for idx, col_lower in enumerate(colunas_lower):
-                if final_nome in col_lower:
-                    coluna_finalizacao = colunas_disponiveis[idx]
-                    break
-            if coluna_finalizacao:
-                break
-        
-        # Criar cópia do DataFrame para modificar
         df_nao_conforme_display = df_nao_conforme.copy()
         
-        # Remover colunas que não queremos mostrar
         colunas_para_remover = ['Ano', 'Mes', 'Mes_Ano']
         for col in colunas_para_remover:
             if col in df_nao_conforme_display.columns:
                 df_nao_conforme_display = df_nao_conforme_display.drop(columns=[col])
         
-        # Verificar se temos colunas de prazo e finalização
-        tem_prazo = coluna_prazo is not None and coluna_prazo in df_nao_conforme_display.columns
-        tem_finalizacao = coluna_finalizacao is not None and coluna_finalizacao in df_nao_conforme_display.columns
-        
-        # Se temos ambas as colunas, calcular status do prazo
-        if tem_prazo and tem_finalizacao:
-            # Garantir que as colunas estejam formatadas (usando a função formatar_data)
-            df_nao_conforme_display['Prazo_Formatado'] = df_nao_conforme_display[coluna_prazo].apply(formatar_data)
-            df_nao_conforme_display['Finalizacao_Formatada'] = df_nao_conforme_display[coluna_finalizacao].apply(formatar_data)
-            
-            # Calcular status do prazo
-            df_nao_conforme_display['Status_Prazo'] = df_nao_conforme_display.apply(
-                lambda row: calcular_status_prazo(row[coluna_prazo], row[coluna_finalizacao]), axis=1
-            )
-            
-            # Reordenar colunas para mostrar as importantes primeiro
-            colunas_ordenadas = []
-            colunas_restantes = []
-            
-            # Priorizar certas colunas
-            colunas_prioridade = ['Unidade', 'Status', 'Status_Prazo', 'Prazo_Formatado', 'Finalizacao_Formatada']
-            
-            for col in colunas_prioridade:
-                if col in df_nao_conforme_display.columns:
-                    colunas_ordenadas.append(col)
-            
-            # Adicionar as outras colunas (exceto as que não queremos)
-            for col in df_nao_conforme_display.columns:
-                if col not in colunas_ordenadas and col not in [coluna_prazo, coluna_finalizacao, 'Prazo_Formatado', 'Finalizacao_Formatada']:
-                    colunas_restantes.append(col)
-            
-            colunas_finais = colunas_ordenadas + colunas_restantes
-            df_nao_conforme_display = df_nao_conforme_display[colunas_finais]
-            
-            # Renomear colunas para exibição
-            rename_dict = {
-                'Prazo_Formatado': 'Prazo',
-                'Finalizacao_Formatada': 'Data Finalização',
-                'Status_Prazo': 'Status Prazo'
-            }
-            df_nao_conforme_display = df_nao_conforme_display.rename(columns=rename_dict)
-            
-            # Condições de estilo baseadas no status do prazo
-            style_data_conditional = [
-                # Status do prazo - Cores da linha inteira
-                {
-                    'if': {
-                        'filter_query': '{Status Prazo} = "Concluído no Prazo"'
-                    },
-                    'backgroundColor': '#eafaf1'
-                },
-                {
-                    'if': {
-                        'filter_query': '{Status Prazo} = "Concluído Fora do Prazo"'
-                    },
-                    'backgroundColor': '#fff8e1'
-                },
-                {
-                    'if': {
-                        'filter_query': '{Status Prazo} = "Não Concluído"'
-                    },
-                    'backgroundColor': '#fdecea'
-                },
-                
-                # Status do prazo - Destaque na coluna
-                {
-                    'if': {
-                        'filter_query': '{Status Prazo} = "Concluído no Prazo"',
-                        'column_id': 'Status Prazo'
-                    },
-                    'backgroundColor': '#27ae60',
-                    'color': 'white',
-                    'fontWeight': 'bold'
-                },
-                {
-                    'if': {
-                        'filter_query': '{Status Prazo} = "Concluído Fora do Prazo"',
-                        'column_id': 'Status Prazo'
-                    },
-                    'backgroundColor': '#f39c12',
-                    'color': 'white',
-                    'fontWeight': 'bold'
-                },
-                {
-                    'if': {
-                        'filter_query': '{Status Prazo} = "Não Concluído"',
-                        'column_id': 'Status Prazo'
-                    },
-                    'backgroundColor': '#e74c3c',
-                    'color': 'white',
-                    'fontWeight': 'bold'
-                },
-                
-                # Status original (Não Conforme)
-                {
-                    'if': {
-                        'filter_query': '{Status} = "Não Conforme"',
-                        'column_id': 'Status'
-                    },
-                    'backgroundColor': '#c0392b',
-                    'color': 'white',
-                    'fontWeight': 'bold'
-                }
-            ]
-        else:
-            # Se não tem colunas de prazo, usar estilo básico
-            style_data_conditional = [
-                {'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
-                {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'},
-                {
-                    'if': {
-                        'filter_query': '{Status} = "Não Conforme"',
-                        'column_id': 'Status'
-                    },
-                    'backgroundColor': '#c0392b',
-                    'color': 'white',
-                    'fontWeight': 'bold'
-                }
-            ]
-        
-        # Aplicar formatação de data em todas as colunas que parecem ser datas
         colunas_data = [col for col in df_nao_conforme_display.columns 
                        if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
         
@@ -774,7 +621,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             style_table={'overflowX':'auto'},
             style_header={'backgroundColor': '#c0392b','color': 'white','fontWeight': 'bold','textAlign':'center'},
             style_cell={'textAlign': 'center','padding': '5px','whiteSpace':'normal','height':'auto'},
-            style_data_conditional=style_data_conditional
+            style_data_conditional=[{'if': {'row_index': 'odd'}, 'backgroundColor': '#f9e6e6'},
+                                    {'if': {'row_index': 'even'}, 'backgroundColor': '#fdecea'}]
         )
         tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)")
     else:
@@ -790,69 +638,46 @@ def atualizar_conteudo_principal(ano, mes, unidade):
     if df_risco is not None and len(df_risco) > 0:
         print(f"\n📋 PROCESSANDO MATRIZ DE RISCO:")
         print(f"  Total de registros: {len(df_risco)}")
-        print(f"  Colunas disponíveis: {df_risco.columns.tolist()}")
         
         df_risco_filtrado = df_risco.copy()
         
-        print(f"  🔍 Aplicando filtros: Ano={ano}, Mês={mes}, Unidade={unidade}")
+        # Aplicar filtros
+        filtros_aplicados = False
         
-        # CORREÇÃO: Converter colunas Ano e Mes para numérico se existirem
         if 'Ano' in df_risco_filtrado.columns:
             df_risco_filtrado['Ano'] = pd.to_numeric(df_risco_filtrado['Ano'], errors='coerce')
-            print(f"  ✅ Coluna 'Ano' convertida para numérico")
         
         if 'Mes' in df_risco_filtrado.columns:
             df_risco_filtrado['Mes'] = pd.to_numeric(df_risco_filtrado['Mes'], errors='coerce')
-            print(f"  ✅ Coluna 'Mes' convertida para numérico")
         
-        # Aplicar filtros - CORREÇÃO: Verificar se as colunas existem
-        filtros_aplicados = False
-        
-        if ano != 'todos':
-            if 'Ano' in df_risco_filtrado.columns:
-                try:
-                    ano_int = int(ano)
-                    antes = len(df_risco_filtrado)
-                    df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
-                    print(f"  ✅ Filtro ANO aplicado: {ano_int}")
-                    print(f"     Registros antes: {antes}, depois: {len(df_risco_filtrado)}")
-                    filtros_aplicados = True
-                except Exception as e:
-                    print(f"  ⚠️ Erro ao filtrar matriz por ano '{ano}': {e}")
-            else:
-                print(f"  ⚠️ Coluna 'Ano' não encontrada na matriz")
-        
-        if mes != 'todos':
-            if 'Mes' in df_risco_filtrado.columns:
-                try:
-                    mes_int = int(mes)
-                    antes = len(df_risco_filtrado)
-                    df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == mes_int]
-                    print(f"  ✅ Filtro MÊS aplicado: {mes_int}")
-                    print(f"     Registros antes: {antes}, depois: {len(df_risco_filtrado)}")
-                    filtros_aplicados = True
-                except Exception as e:
-                    print(f"  ⚠️ Erro ao filtrar matriz por mês '{mes}': {e}")
-            else:
-                print(f"  ⚠️ Coluna 'Mes' não encontrada na matriz")
-        
-        if unidade != 'todas':
-            if 'Unidade' in df_risco_filtrado.columns:
-                antes = len(df_risco_filtrado)
-                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
-                print(f"  ✅ Filtro UNIDADE aplicado: '{unidade}'")
-                print(f"     Registros antes: {antes}, depois: {len(df_risco_filtrado)}")
+        if ano != 'todos' and 'Ano' in df_risco_filtrado.columns:
+            try:
+                ano_int = int(ano)
+                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Ano'] == ano_int]
+                print(f"  ✅ Filtro ANO aplicado: {ano_int}")
                 filtros_aplicados = True
-            else:
-                print(f"  ⚠️ Coluna 'Unidade' não encontrada na matriz")
+            except:
+                pass
+        
+        if mes != 'todos' and 'Mes' in df_risco_filtrado.columns:
+            try:
+                mes_int = int(mes)
+                df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Mes'] == mes_int]
+                print(f"  ✅ Filtro MÊS aplicado: {mes_int}")
+                filtros_aplicados = True
+            except:
+                pass
+        
+        if unidade != 'todas' and 'Unidade' in df_risco_filtrado.columns:
+            df_risco_filtrado = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade]
+            print(f"  ✅ Filtro UNIDADE aplicado: '{unidade}'")
+            filtros_aplicados = True
 
         print(f"\n📋 Matriz após filtros: {len(df_risco_filtrado)} registros")
         
         if len(df_risco_filtrado) > 0:
             # Garantir que temos coluna Mes_Ano
             if 'Mes_Ano' not in df_risco_filtrado.columns:
-                print("  ⚠️ Coluna Mes_Ano não encontrada, criando...")
-                # Tentar criar a partir de Mes e Ano
                 if 'Mes' in df_risco_filtrado.columns and 'Ano' in df_risco_filtrado.columns:
                     df_risco_filtrado['Mes_Ano'] = df_risco_filtrado.apply(
                         lambda row: f"{int(row['Mes']):02d}/{int(row['Ano'])}" 
@@ -860,11 +685,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                         else "Sem Data", 
                         axis=1
                     )
-                    print(f"  ✅ Coluna Mes_Ano criada")
                 else:
-                    # Se não tem Mes e Ano, criar coluna padrão
                     df_risco_filtrado['Mes_Ano'] = "Sem Data"
-                    print(f"  ⚠️ Criada coluna Mes_Ano padrão")
             
             # Agrupar dados por Unidade e Mes_Ano
             unidades = sorted(df_risco_filtrado['Unidade'].dropna().unique())
@@ -873,200 +695,199 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             print(f"  📊 Unidades encontradas: {len(unidades)} - {unidades}")
             print(f"  📅 Períodos encontrados: {len(meses_anos)} - {meses_anos}")
             
-            # Se só tiver um mês/ano, verificar se precisa criar mais colunas
-            if len(meses_anos) <= 1:
-                print(f"  ⚠️ Apenas {len(meses_anos)} período encontrado")
-            
-            # Criar estrutura de dados para a matriz
-            matriz_data = []
-            
-            for unidade_nome in unidades:
-                linha = {'Unidade': unidade_nome}
-                df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
+            # Se não tiver períodos válidos, adicionar mensagem de erro
+            if len(meses_anos) == 0 or (len(meses_anos) == 1 and meses_anos[0] == "Sem Data"):
+                abas_extra.append(html.Div([
+                    html.H3("📋 Matriz Auditoria Risco"),
+                    html.P("⚠️ Não foi possível extrair períodos (mês/ano) das datas.", 
+                           style={'textAlign':'center', 'color':'#e74c3c', 'padding': '20px'}),
+                    html.P("Verifique se a coluna 'Data' na planilha está no formato dd/mm/aaaa.", 
+                           style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '10px'})
+                ], style={'marginTop':'30px'}))
+            else:
+                # Criar estrutura de dados para a matriz
+                matriz_data = []
                 
-                for mes_ano in meses_anos:
-                    if pd.isna(mes_ano) or mes_ano == "Sem Data" or mes_ano == "":
-                        continue
+                for unidade_nome in unidades:
+                    linha = {'Unidade': unidade_nome}
+                    df_unidade = df_risco_filtrado[df_risco_filtrado['Unidade'] == unidade_nome]
                     
-                    df_mes = df_unidade[df_unidade['Mes_Ano'] == mes_ano]
-                    
-                    if len(df_mes) > 0:
-                        # Criar lista de relatórios com cores
-                        relatorios_html = []
-                        for _, row in df_mes.iterrows():
-                            relatorio = str(row.get('Relatorio', 'Sem Relatório'))
-                            status = str(row.get('Status', 'Sem Status'))
-                            cores = get_status_color(status)
-                            
-                            relatorio_item = html.Span(
-                                relatorio,
-                                style={
-                                    'display': 'inline-block',
-                                    'backgroundColor': cores['bg_color'],
-                                    'color': cores['text_color'],
-                                    'padding': '4px 8px',
-                                    'margin': '2px',
-                                    'borderRadius': '3px',
-                                    'fontSize': '12px',
-                                    'fontWeight': 'bold',
-                                    'borderLeft': f'3px solid {cores["border_color"]}'
-                                }
-                            )
-                            relatorios_html.append(relatorio_item)
+                    for mes_ano in meses_anos:
+                        if pd.isna(mes_ano) or mes_ano == "Sem Data":
+                            continue
                         
-                        # Se houver múltiplos relatórios, colocar em container
-                        if len(relatorios_html) > 0:
-                            linha[mes_ano] = html.Div(
-                                relatorios_html,
-                                style={
-                                    'display': 'flex',
-                                    'flexWrap': 'wrap',
-                                    'gap': '3px',
-                                    'justifyContent': 'center',
-                                    'alignItems': 'center',
-                                    'minHeight': '40px'
-                                }
-                            )
+                        df_mes = df_unidade[df_unidade['Mes_Ano'] == mes_ano]
+                        
+                        if len(df_mes) > 0:
+                            relatorios_html = []
+                            for _, row in df_mes.iterrows():
+                                relatorio = str(row.get('Relatorio', 'Sem Relatório'))
+                                status = str(row.get('Status', 'Sem Status'))
+                                cores = get_status_color(status)
+                                
+                                relatorio_item = html.Span(
+                                    relatorio,
+                                    style={
+                                        'display': 'inline-block',
+                                        'backgroundColor': cores['bg_color'],
+                                        'color': cores['text_color'],
+                                        'padding': '4px 8px',
+                                        'margin': '2px',
+                                        'borderRadius': '3px',
+                                        'fontSize': '12px',
+                                        'fontWeight': 'bold',
+                                        'borderLeft': f'3px solid {cores["border_color"]}'
+                                    }
+                                )
+                                relatorios_html.append(relatorio_item)
+                            
+                            if len(relatorios_html) > 0:
+                                linha[mes_ano] = html.Div(
+                                    relatorios_html,
+                                    style={
+                                        'display': 'flex',
+                                        'flexWrap': 'wrap',
+                                        'gap': '3px',
+                                        'justifyContent': 'center',
+                                        'alignItems': 'center',
+                                        'minHeight': '40px'
+                                    }
+                                )
+                            else:
+                                linha[mes_ano] = ""
                         else:
                             linha[mes_ano] = ""
-                    else:
-                        linha[mes_ano] = ""
+                    
+                    matriz_data.append(linha)
                 
-                matriz_data.append(linha)
-            
-            # Criar tabela HTML manualmente
-            tabela_cabecalho = [html.Th("Unidade", style={
-                'backgroundColor': '#34495e',
-                'color': 'white',
-                'padding': '12px',
-                'textAlign': 'center',
-                'fontWeight': 'bold',
-                'border': '1px solid #2c3e50',
-                'minWidth': '150px',
-                'position': 'sticky',
-                'left': '0',
-                'zIndex': '1'
-            })]
-            
-            for mes_ano in meses_anos:
-                if pd.isna(mes_ano) or mes_ano in ["Sem Data", ""]:
-                    continue
-                tabela_cabecalho.append(html.Th(str(mes_ano), style={
+                # Criar tabela HTML
+                tabela_cabecalho = [html.Th("Unidade", style={
                     'backgroundColor': '#34495e',
                     'color': 'white',
                     'padding': '12px',
                     'textAlign': 'center',
                     'fontWeight': 'bold',
                     'border': '1px solid #2c3e50',
-                    'minWidth': '200px'
-                }))
-            
-            tabela_linhas = []
-            
-            for i, linha in enumerate(matriz_data):
-                bg_color = '#f8f9fa' if i % 2 == 0 else 'white'
-                
-                celulas = [html.Td(linha['Unidade'], style={
-                    'backgroundColor': bg_color,
-                    'padding': '10px',
-                    'textAlign': 'center',
-                    'border': '1px solid #dee2e6',
-                    'fontWeight': 'bold',
+                    'minWidth': '150px',
                     'position': 'sticky',
                     'left': '0',
                     'zIndex': '1'
                 })]
                 
                 for mes_ano in meses_anos:
-                    if pd.isna(mes_ano) or mes_ano in ["Sem Data", ""]:
+                    if pd.isna(mes_ano) or mes_ano == "Sem Data":
                         continue
-                    
-                    conteudo = linha.get(mes_ano, "")
-                    celulas.append(html.Td(
-                        conteudo,
-                        style={
-                            'backgroundColor': bg_color,
-                            'padding': '8px',
-                            'textAlign': 'center',
-                            'border': '1px solid #dee2e6',
-                            'verticalAlign': 'middle',
-                            'minHeight': '50px'
-                        }
-                    ))
+                    tabela_cabecalho.append(html.Th(str(mes_ano), style={
+                        'backgroundColor': '#34495e',
+                        'color': 'white',
+                        'padding': '12px',
+                        'textAlign': 'center',
+                        'fontWeight': 'bold',
+                        'border': '1px solid #2c3e50',
+                        'minWidth': '200px'
+                    }))
                 
-                tabela_linhas.append(html.Tr(celulas, style={'borderBottom': '1px solid #dee2e6'}))
-            
-            # Criar tabela HTML
-            tabela_html = html.Table([
-                html.Thead(html.Tr(tabela_cabecalho)),
-                html.Tbody(tabela_linhas)
-            ], style={
-                'width': '100%',
-                'borderCollapse': 'collapse',
-                'marginTop': '10px',
-                'fontFamily': 'Arial, sans-serif',
-                'fontSize': '14px'
-            })
-            
-            # Container com scroll horizontal
-            tabela_container = html.Div(
-                tabela_html,
-                style={
-                    'overflowX': 'auto',
-                    'maxWidth': '100%',
-                    'marginTop': '15px',
-                    'border': '1px solid #dee2e6',
+                tabela_linhas = []
+                
+                for i, linha in enumerate(matriz_data):
+                    bg_color = '#f8f9fa' if i % 2 == 0 else 'white'
+                    
+                    celulas = [html.Td(linha['Unidade'], style={
+                        'backgroundColor': bg_color,
+                        'padding': '10px',
+                        'textAlign': 'center',
+                        'border': '1px solid #dee2e6',
+                        'fontWeight': 'bold',
+                        'position': 'sticky',
+                        'left': '0',
+                        'zIndex': '1'
+                    })]
+                    
+                    for mes_ano in meses_anos:
+                        if pd.isna(mes_ano) or mes_ano == "Sem Data":
+                            continue
+                        
+                        conteudo = linha.get(mes_ano, "")
+                        celulas.append(html.Td(
+                            conteudo,
+                            style={
+                                'backgroundColor': bg_color,
+                                'padding': '8px',
+                                'textAlign': 'center',
+                                'border': '1px solid #dee2e6',
+                                'verticalAlign': 'middle',
+                                'minHeight': '50px'
+                            }
+                        ))
+                    
+                    tabela_linhas.append(html.Tr(celulas, style={'borderBottom': '1px solid #dee2e6'}))
+                
+                tabela_html = html.Table([
+                    html.Thead(html.Tr(tabela_cabecalho)),
+                    html.Tbody(tabela_linhas)
+                ], style={
+                    'width': '100%',
+                    'borderCollapse': 'collapse',
+                    'marginTop': '10px',
+                    'fontFamily': 'Arial, sans-serif',
+                    'fontSize': '14px'
+                })
+                
+                tabela_container = html.Div(
+                    tabela_html,
+                    style={
+                        'overflowX': 'auto',
+                        'maxWidth': '100%',
+                        'marginTop': '15px',
+                        'border': '1px solid #dee2e6',
+                        'borderRadius': '5px',
+                        'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
+                    }
+                )
+                
+                legenda = html.Div([
+                    html.H4("Legenda de Status:", style={'marginBottom': '10px', 'color': '#2c3e50'}),
+                    html.Div([
+                        html.Div([
+                            html.Span("🔴 ", style={'fontSize': '16px', 'marginRight': '5px'}),
+                            html.Span("Não Iniciado", style={'color': '#2c3e50'})
+                        ], style={'display': 'inline-block', 'marginRight': '20px'}),
+                        
+                        html.Div([
+                            html.Span("🟡 ", style={'fontSize': '16px', 'marginRight': '5px'}),
+                            html.Span("Pendente", style={'color': '#2c3e50'})
+                        ], style={'display': 'inline-block', 'marginRight': '20px'}),
+                        
+                        html.Div([
+                            html.Span("🟢 ", style={'fontSize': '16px', 'marginRight': '5px'}),
+                            html.Span("Finalizado", style={'color': '#2c3e50'})
+                        ], style={'display': 'inline-block'})
+                    ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px'})
+                ], style={
+                    'backgroundColor': '#f8f9fa',
+                    'padding': '15px',
                     'borderRadius': '5px',
-                    'boxShadow': '0 2px 4px rgba(0,0,0,0.1)'
-                }
-            )
-            
-            # Legenda
-            legenda = html.Div([
-                html.H4("Legenda de Status:", style={'marginBottom': '10px', 'color': '#2c3e50'}),
-                html.Div([
-                    html.Div([
-                        html.Span("🔴 ", style={'fontSize': '16px', 'marginRight': '5px'}),
-                        html.Span("Não Iniciado", style={'color': '#2c3e50'})
-                    ], style={'display': 'inline-block', 'marginRight': '20px'}),
-                    
-                    html.Div([
-                        html.Span("🟡 ", style={'fontSize': '16px', 'marginRight': '5px'}),
-                        html.Span("Pendente", style={'color': '#2c3e50'})
-                    ], style={'display': 'inline-block', 'marginRight': '20px'}),
-                    
-                    html.Div([
-                        html.Span("🟢 ", style={'fontSize': '16px', 'marginRight': '5px'}),
-                        html.Span("Finalizado", style={'color': '#2c3e50'})
-                    ], style={'display': 'inline-block'})
-                ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '15px'})
-            ], style={
-                'backgroundColor': '#f8f9fa',
-                'padding': '15px',
-                'borderRadius': '5px',
-                'marginBottom': '20px',
-                'border': '1px solid #dee2e6'
-            })
-            
-            titulo_matriz = f"📋 Matriz Auditoria Risco ({len(df_risco_filtrado)} registros)"
-            if filtros_aplicados:
-                titulo_matriz += f" - Filtrado"
-            
-            abas_extra.append(html.Div([
-                html.H3(titulo_matriz, style={'marginBottom': '20px'}),
-                html.P(f"Período: {ano if ano != 'todos' else 'Todos'} {f'Mês: {mes}' if mes != 'todos' else ''}", 
-                       style={'color': '#7f8c8d', 'marginBottom': '5px'}),
-                html.P(f"Unidades: {len(unidades)} | Períodos: {len(meses_anos)}", 
-                       style={'color': '#7f8c8d', 'marginBottom': '10px'}),
-                legenda,
-                tabela_container
-            ], style={
-                'marginTop': '30px',
-                'padding': '25px',
-                'backgroundColor': 'white',
-                'borderRadius': '8px',
-                'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
-            }))
+                    'marginBottom': '20px',
+                    'border': '1px solid #dee2e6'
+                })
+                
+                titulo_matriz = f"📋 Matriz Auditoria Risco ({len(df_risco_filtrado)} registros)"
+                
+                abas_extra.append(html.Div([
+                    html.H3(titulo_matriz, style={'marginBottom': '20px'}),
+                    html.P(f"Período: {ano if ano != 'todos' else 'Todos'} {f'Mês: {mes}' if mes != 'todos' else ''}", 
+                           style={'color': '#7f8c8d', 'marginBottom': '5px'}),
+                    html.P(f"Unidades: {len(unidades)} | Períodos: {len([ma for ma in meses_anos if ma != 'Sem Data'])}", 
+                           style={'color': '#7f8c8d', 'marginBottom': '10px'}),
+                    legenda,
+                    tabela_container
+                ], style={
+                    'marginTop': '30px',
+                    'padding': '25px',
+                    'backgroundColor': 'white',
+                    'borderRadius': '8px',
+                    'boxShadow': '0 2px 8px rgba(0,0,0,0.1)'
+                }))
         else:
             abas_extra.append(html.Div([
                 html.H3("📋 Matriz Auditoria Risco"),
@@ -1080,10 +901,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                    style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '40px'})
         ], style={'marginTop':'30px'}))
 
-    # ---------- Melhorias e Políticas (SEM FILTROS) ----------
-    # Mostrar sempre todos os dados sem aplicar filtros
+    # ---------- Melhorias e Políticas ----------
     if df_melhorias is not None and len(df_melhorias) > 0:
-        # Aplicar formatação de data nas colunas de data
         colunas_data_melhorias = [col for col in df_melhorias.columns 
                                  if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
         
@@ -1107,15 +926,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                    style={'color': '#7f8c8d', 'marginBottom': '10px'}),
             tabela_melhorias
         ], style={'marginTop':'30px'}))
-    else:
-        abas_extra.append(html.Div([
-            html.H3("📈 Melhorias"),
-            html.P("Não há dados de melhorias disponíveis.", 
-                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '20px'})
-        ], style={'marginTop':'30px'}))
 
     if df_politicas is not None and len(df_politicas) > 0:
-        # Aplicar formatação de data nas colunas de data
         colunas_data_politicas = [col for col in df_politicas.columns 
                                  if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
         
@@ -1139,12 +951,6 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                    style={'color': '#7f8c8d', 'marginBottom': '10px'}),
             tabela_politicas
         ], style={'marginTop':'30px'}))
-    else:
-        abas_extra.append(html.Div([
-            html.H3("📑 Políticas"),
-            html.P("Não há dados de políticas disponíveis.", 
-                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '20px'})
-        ], style={'marginTop':'30px'}))
 
     return html.Div([
         html.Div([
@@ -1165,6 +971,3 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
-
-
