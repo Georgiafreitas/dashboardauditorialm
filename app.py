@@ -659,167 +659,154 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         }
     )
     
-    # Criar lista de siglas e seus significados
-    lista_siglas = []
-    
-    for sigla in siglas_ordenadas:
+    # Criar lista de siglas COMPACTA - UMA AO LADO DA OUTRA
+    lista_siglas_items = []
+    for i, sigla in enumerate(siglas_ordenadas):
         significado = obter_significado_sigla(sigla)
-        lista_siglas.append(html.Div([
-            html.Span(f"{sigla}", style={
+        # Adiciona item com sigla e significado
+        lista_siglas_items.append(html.Span([
+            html.Span(f"{sigla}: ", style={
                 'fontWeight': '600',
                 'color': '#2c3e50',
-                'fontSize': '9px',
-                'minWidth': '30px',
-                'display': 'inline-block',
+                'fontSize': '8px',
                 'backgroundColor': '#ecf0f1',
-                'padding': '2px 4px',
+                'padding': '1px 3px',
                 'borderRadius': '2px',
-                'marginRight': '6px',
-                'textAlign': 'center',
+                'marginRight': '2px',
                 'border': '1px solid #bdc3c7',
-                'flexShrink': '0'
             }),
             html.Span(significado, style={
                 'color': '#2c3e50',
-                'fontSize': '9px',
-                'lineHeight': '1.2',
-                'flexGrow': '1'
+                'fontSize': '8px',
+                'marginRight': '10px',  # Espaço entre itens
             })
-        ], style={
-            'marginBottom': '4px',
-            'padding': '3px 5px',
-            'borderBottom': '1px solid #ecf0f1',
-            'backgroundColor': '#ffffff',
-            'borderRadius': '2px',
-            'display': 'flex',
-            'alignItems': 'center',
-            'minHeight': '24px'
-        }))
+        ], style={'display': 'inline-block', 'marginRight': '8px', 'marginBottom': '3px'}))
     
     # Se não encontrou siglas conhecidas, mostrar mensagem
     if not siglas_encontradas:
-        lista_siglas = [html.P("Nenhuma sigla conhecida encontrada nos dados.", 
+        lista_siglas_items = [html.P("Nenhuma sigla conhecida encontrada nos dados.", 
                                style={'color': '#7f8c8d', 'fontSize': '10px', 'textAlign': 'center', 'padding': '10px'})]
     
-    # Container da lista de siglas
+    # Container da lista de siglas COMPACTO
     lista_siglas_container = html.Div([
         html.Div([
             html.H4("📋 LEGENDA DE SIGLAS", style={
-                'margin': '0 0 8px 0',
+                'margin': '0 0 5px 0',
                 'color': '#2c3e50',
-                'fontSize': '11px',
+                'fontSize': '10px',
                 'fontWeight': '600'
             }),
-            html.P(f"Total de {len(siglas_encontradas)} siglas distintas encontradas", 
-                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '9px'})
+            html.P(f"Total de {len(siglas_encontradas)} siglas distintas", 
+                   style={'color': '#7f8c8d', 'marginBottom': '5px', 'fontSize': '8px'})
         ], style={
             'backgroundColor': '#ecf0f1',
-            'padding': '8px',
+            'padding': '6px',
             'borderRadius': '2px 2px 0 0',
             'borderBottom': '1px solid #bdc3c7'
         }),
-        html.Div(lista_siglas, style={
-            'maxHeight': '100px',  # Altura reduzida para caber tudo
+        html.Div(lista_siglas_items, style={
+            'maxHeight': '80px',  # Altura bem reduzida
             'overflowY': 'auto', 
-            'padding': '8px',
-            'backgroundColor': '#ffffff'
+            'padding': '6px',
+            'backgroundColor': '#ffffff',
+            'lineHeight': '1.4'
         })
     ], style={
-        'marginTop': '10px',
+        'marginTop': '8px',
         'borderRadius': '3px',
         'border': '1px solid #dde1e6',
         'boxShadow': '0 1px 2px rgba(0,0,0,0.1)',
         'overflow': 'hidden'
     })
     
-    # Legenda de cores
+    # Legenda de cores COMPACTA
     legenda_cores = html.Div([
         html.Div([
             html.H5("🎨 LEGENDA DE STATUS", style={
-                'margin': '0 0 6px 0',
+                'margin': '0 0 4px 0',
                 'color': '#2c3e50',
-                'fontSize': '10px',
+                'fontSize': '9px',
                 'fontWeight': '600'
             })
-        ], style={'marginBottom': '6px'}),
+        ], style={'marginBottom': '4px'}),
         html.Div([
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '8px',
+                    'height': '8px',
                     'backgroundColor': '#c0392b',
-                    'borderRadius': '2px',
-                    'marginRight': '5px',
+                    'borderRadius': '1px',
+                    'marginRight': '4px',
                     'border': '1px solid #c0392b',
                     'flexShrink': '0'
                 }),
-                html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '9px', 'fontWeight': '500'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '12px', 'marginBottom': '4px'}),
+                html.Span("Não Iniciado", style={'color': '#2c3e50', 'fontSize': '8px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '8px', 'marginBottom': '3px'}),
             
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '8px',
+                    'height': '8px',
                     'backgroundColor': '#f39c12',
-                    'borderRadius': '2px',
-                    'marginRight': '5px',
+                    'borderRadius': '1px',
+                    'marginRight': '4px',
                     'border': '1px solid #f39c12',
                     'flexShrink': '0'
                 }),
-                html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '9px', 'fontWeight': '500'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '12px', 'marginBottom': '4px'}),
+                html.Span("Pendente", style={'color': '#2c3e50', 'fontSize': '8px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '8px', 'marginBottom': '3px'}),
             
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '8px',
+                    'height': '8px',
                     'backgroundColor': '#27ae60',
-                    'borderRadius': '2px',
-                    'marginRight': '5px',
+                    'borderRadius': '1px',
+                    'marginRight': '4px',
                     'border': '1px solid #27ae60',
                     'flexShrink': '0'
                 }),
-                html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '9px', 'fontWeight': '500'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '12px', 'marginBottom': '4px'}),
+                html.Span("Finalizado", style={'color': '#2c3e50', 'fontSize': '8px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginRight': '8px', 'marginBottom': '3px'}),
             
             html.Div([
                 html.Div(style={
-                    'width': '10px',
-                    'height': '10px',
+                    'width': '8px',
+                    'height': '8px',
                     'backgroundColor': '#fff8e1',
-                    'borderRadius': '2px',
-                    'marginRight': '5px',
+                    'borderRadius': '1px',
+                    'marginRight': '4px',
                     'border': '1px solid #f39c12',
                     'flexShrink': '0'
                 }),
-                html.Span("Conforme Parcial", style={'color': '#2c3e50', 'fontSize': '9px', 'fontWeight': '500'})
-            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '4px'})
-        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '8px', 'alignItems': 'center'})
+                html.Span("Conforme Parcial", style={'color': '#2c3e50', 'fontSize': '8px', 'fontWeight': '500'})
+            ], style={'display': 'flex', 'alignItems': 'center', 'marginBottom': '3px'})
+        ], style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '6px', 'alignItems': 'center'})
     ], style={
         'backgroundColor': '#f8fafc',
-        'padding': '8px',
+        'padding': '6px',
         'borderRadius': '3px',
-        'marginBottom': '10px',
+        'marginBottom': '8px',
         'border': '1px solid #dde1e6',
-        'fontSize': '9px'
+        'fontSize': '8px'
     })
     
     titulo_matriz = html.Div([
         html.H4(f"📋 MATRIZ DE RISCO - {ano_filtro}", style={
             'margin': '0 0 2px 0',
             'color': '#2c3e50',
-            'fontSize': '13px',
+            'fontSize': '12px',
             'fontWeight': '600'
         }),
         html.P(f"{len(df_risco_filtrado)} registros • {len(unidades)} unidades • {len(siglas_encontradas)} siglas", 
-               style={'color': '#7f8c8d', 'margin': '0', 'fontSize': '9px'})
+               style={'color': '#7f8c8d', 'margin': '0', 'fontSize': '8px'})
     ], style={
-        'marginBottom': '10px',
-        'padding': '8px',
+        'marginBottom': '8px',
+        'padding': '6px',
         'backgroundColor': '#ecf0f1',
         'borderRadius': '3px',
         'border': '1px solid #bdc3c7',
-        'fontSize': '10px'
+        'fontSize': '9px'
     })
     
     # DEBUG: Mostrar quantos registros estão sendo processados
@@ -834,14 +821,14 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         titulo_matriz,
         legenda_cores,
         html.P("Cada célula mostra TODAS as siglas dos relatórios daquela unidade/mês", 
-               style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '9px', 'textAlign': 'center'}),
+               style={'color': '#7f8c8d', 'marginBottom': '6px', 'fontSize': '8px', 'textAlign': 'center'}),
         html.P(f"Dica: Passe o mouse sobre uma sigla para ver detalhes", 
-               style={'color': '#3498db', 'marginBottom': '5px', 'fontSize': '8px', 'textAlign': 'center', 'fontStyle': 'italic'}),
+               style={'color': '#3498db', 'marginBottom': '3px', 'fontSize': '7px', 'textAlign': 'center', 'fontStyle': 'italic'}),
         tabela_container,
         lista_siglas_container
     ], style={
-        'marginTop': '10px',
-        'padding': '10px',
+        'marginTop': '8px',
+        'padding': '8px',
         'backgroundColor': 'white',
         'borderRadius': '3px',
         'boxShadow': '0 1px 3px rgba(0,0,0,0.05)',
@@ -1220,44 +1207,44 @@ app.layout = html.Div([
         html.H1("📊 DASHBOARD DE AUDITORIA", 
                 style={
                     'textAlign':'center', 
-                    'marginBottom':'10px',
-                    'fontSize': '18px',
+                    'marginBottom':'8px',
+                    'fontSize': '16px',
                     'color': '#2c3e50'
                 })
     ]),
     html.Div([
         html.Div([
-            html.Label("Ano:", style={'fontSize': '11px', 'fontWeight': 'bold', 'marginBottom': '2px'}),
+            html.Label("Ano:", style={'fontSize': '10px', 'fontWeight': 'bold', 'marginBottom': '1px'}),
             dcc.Dropdown(
                 id='filtro-ano',
                 options=[{'label':'Todos','value':'todos'}]+
                        [{'label':str(a),'value':a} for a in anos_disponiveis],
                 value='todos',
-                style={'fontSize': '11px', 'minHeight': '30px'}
+                style={'fontSize': '10px', 'minHeight': '28px', 'padding': '2px'}
             )
-        ], style={'marginRight':'10px','width':'150px'}),
+        ], style={'marginRight':'8px','width':'140px'}),
         html.Div([
-            html.Label("Mês:", style={'fontSize': '11px', 'fontWeight': 'bold', 'marginBottom': '2px'}),
+            html.Label("Mês:", style={'fontSize': '10px', 'fontWeight': 'bold', 'marginBottom': '1px'}),
             dcc.Dropdown(
                 id='filtro-mes',
                 options=[{'label':'Todos','value':'todos'}]+
                        [{'label':f'{m}','value':m} for m in range(1, 13)],
                 value='todos',
-                style={'fontSize': '11px', 'minHeight': '30px'}
+                style={'fontSize': '10px', 'minHeight': '28px', 'padding': '2px'}
             )
-        ], style={'marginRight':'10px','width':'120px'}),
+        ], style={'marginRight':'8px','width':'110px'}),
         html.Div([
-            html.Label("Unidade:", style={'fontSize': '11px', 'fontWeight': 'bold', 'marginBottom': '2px'}),
+            html.Label("Unidade:", style={'fontSize': '10px', 'fontWeight': 'bold', 'marginBottom': '1px'}),
             dcc.Dropdown(
                 id='filtro-unidade',
                 options=[{'label':'Todas','value':'todas'}]+
                         [{'label':str(u),'value':str(u)} for u in sorted(df_checklist['Unidade'].dropna().unique())],
                 value='todas',
-                style={'fontSize': '11px', 'minHeight': '30px'}
+                style={'fontSize': '10px', 'minHeight': '28px', 'padding': '2px'}
             )
-        ], style={'width':'160px'})
-    ], style={'display':'flex','justifyContent':'center','marginBottom':'15px','flexWrap':'wrap', 'padding': '5px'}),
-    html.Div(id='conteudo-principal', style={'padding':'10px', 'maxWidth': '1400px', 'margin': '0 auto', 'overflowY': 'auto'})
+        ], style={'width':'150px'})
+    ], style={'display':'flex','justifyContent':'center','marginBottom':'10px','flexWrap':'wrap', 'padding': '3px', 'gap': '5px'}),
+    html.Div(id='conteudo-principal', style={'padding':'8px', 'maxWidth': '1400px', 'margin': '0 auto', 'overflowY': 'auto'})
 ])
 
 # ========== CALLBACKS ==========
@@ -1319,34 +1306,34 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         parcial = 0
         nao = 0
 
-    # ---------- KPIs GERAIS COMPACTOS ----------
+    # ---------- KPIs GERAIS SUPER COMPACTOS ----------
     kpis = html.Div([
         html.Div([
-            html.H4("Conforme", style={'color':'#27ae60','margin':'0', 'fontSize': '12px'}),
-            html.H2(f"{conforme}", style={'color':'#27ae60','margin':'0', 'fontSize': '22px'}),
-            html.P(f"{(conforme/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#27ae60', 'fontSize': '10px'})
-        ], style={'borderLeft':'4px solid #27ae60','borderRadius':'3px','padding':'10px','margin':'5px','flex':'1',
+            html.H4("Conforme", style={'color':'#27ae60','margin':'0', 'fontSize': '11px'}),
+            html.H2(f"{conforme}", style={'color':'#27ae60','margin':'0', 'fontSize': '20px'}),
+            html.P(f"{(conforme/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#27ae60', 'fontSize': '9px'})
+        ], style={'borderLeft':'3px solid #27ae60','borderRadius':'2px','padding':'6px','margin':'2px','flex':'1',
                   'backgroundColor':'#eafaf1','textAlign':'center','boxShadow':'0 1px 2px rgba(0,0,0,0.05)',
-                  'minWidth': '120px', 'maxWidth': '140px'}),
+                  'minWidth': '100px', 'maxWidth': '110px', 'height': '70px'}),
 
         html.Div([
-            html.H4("Conforme Parcial", style={'color':'#f39c12','margin':'0', 'fontSize': '12px'}),
-            html.H2(f"{parcial}", style={'color':'#f39c12','margin':'0', 'fontSize': '22px'}),
-            html.P(f"{(parcial/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#f39c12', 'fontSize': '10px'})
-        ], style={'borderLeft':'4px solid #f39c12','borderRadius':'3px','padding':'10px','margin':'5px','flex':'1',
+            html.H4("Conforme Parcial", style={'color':'#f39c12','margin':'0', 'fontSize': '11px'}),
+            html.H2(f"{parcial}", style={'color':'#f39c12','margin':'0', 'fontSize': '20px'}),
+            html.P(f"{(parcial/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#f39c12', 'fontSize': '9px'})
+        ], style={'borderLeft':'3px solid #f39c12','borderRadius':'2px','padding':'6px','margin':'2px','flex':'1',
                   'backgroundColor':'#fff8e1','textAlign':'center','boxShadow':'0 1px 2px rgba(0,0,0,0.05)',
-                  'minWidth': '120px', 'maxWidth': '140px'}),
+                  'minWidth': '100px', 'maxWidth': '110px', 'height': '70px'}),
 
         html.Div([
-            html.H4("Não Conforme", style={'color':'#e74c3c','margin':'0', 'fontSize': '12px'}),
-            html.H2(f"{nao}", style={'color':'#e74c3c','margin':'0', 'fontSize': '22px'}),
-            html.P(f"{(nao/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#e74c3c', 'fontSize': '10px'})
-        ], style={'borderLeft':'4px solid #e74c3c','borderRadius':'3px','padding':'10px','margin':'5px','flex':'1',
+            html.H4("Não Conforme", style={'color':'#e74c3c','margin':'0', 'fontSize': '11px'}),
+            html.H2(f"{nao}", style={'color':'#e74c3c','margin':'0', 'fontSize': '20px'}),
+            html.P(f"{(nao/total*100 if total>0 else 0):.1f}%", style={'margin':'0','color':'#e74c3c', 'fontSize': '9px'})
+        ], style={'borderLeft':'3px solid #e74c3c','borderRadius':'2px','padding':'6px','margin':'2px','flex':'1',
                   'backgroundColor':'#fdecea','textAlign':'center','boxShadow':'0 1px 2px rgba(0,0,0,0.05)',
-                  'minWidth': '120px', 'maxWidth': '140px'})
-    ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'15px', 'gap': '3px'})
+                  'minWidth': '100px', 'maxWidth': '110px', 'height': '70px'})
+    ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'10px', 'gap': '2px'})
 
-    # ---------- Tabela de NÃO CONFORMES COM COMPARAÇÃO DE PRAZOS ----------
+    # ---------- Tabela de NÃO CONFORMES MAIOR ----------
     df_nao_conforme = df[df['Status']=='Não Conforme']
     
     # Inicializar contadores de prazo
@@ -1425,12 +1412,12 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'Status_Prazo': 'Status do Prazo'
             })
             
-            # Criar tabela COMPACTA com cores condicionais
+            # Criar tabela MAIOR com cores condicionais
             tabela_nao_conforme = dash_table.DataTable(
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
-                page_size=5,  # Menos linhas por página
-                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px', 'height': '180px'},
+                page_size=10,  # AUMENTADO de 5 para 10 linhas
+                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px', 'height': '300px'},  # AUMENTADA altura
                 style_header={
                     'backgroundColor': '#c0392b',
                     'color': 'white',
@@ -1439,7 +1426,9 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'fontSize': '10px',
                     'padding': '4px 5px',
                     'minHeight': '30px',
-                    'height': '30px'
+                    'height': '30px',
+                    'position': 'sticky',
+                    'top': '0'
                 },
                 style_cell={
                     'textAlign': 'center',
@@ -1447,8 +1436,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'whiteSpace':'normal',
                     'height':'auto',
                     'fontSize': '9px',
-                    'minWidth': '40px',
-                    'maxWidth': '120px',
+                    'minWidth': '50px',  # Aumentado
+                    'maxWidth': '150px', # Aumentado
                     'overflow': 'hidden',
                     'textOverflow': 'ellipsis'
                 },
@@ -1483,7 +1472,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             )
             
         else:
-            # Se não encontrou as colunas, mostrar tabela normal COMPACTA
+            # Se não encontrou as colunas, mostrar tabela normal MAIOR
             print(f"⚠️ Não encontrou colunas de prazo/finalização. Colunas disponíveis: {colunas_disponiveis}")
             
             # Remover colunas desnecessárias
@@ -1511,8 +1500,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             tabela_nao_conforme = dash_table.DataTable(
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
-                page_size=5,
-                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px', 'height': '180px'},
+                page_size=10,  # AUMENTADO
+                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px', 'height': '300px'},  # AUMENTADA
                 style_header={
                     'backgroundColor': '#c0392b',
                     'color': 'white',
@@ -1521,7 +1510,9 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'fontSize': '10px',
                     'padding': '4px 5px',
                     'minHeight': '30px',
-                    'height': '30px'
+                    'height': '30px',
+                    'position': 'sticky',
+                    'top': '0'
                 },
                 style_cell={
                     'textAlign': 'center',
@@ -1529,8 +1520,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     'whiteSpace':'normal',
                     'height':'auto',
                     'fontSize': '9px',
-                    'minWidth': '40px',
-                    'maxWidth': '120px',
+                    'minWidth': '50px',  # Aumentado
+                    'maxWidth': '150px', # Aumentado
                     'overflow': 'hidden',
                     'textOverflow': 'ellipsis'
                 },
@@ -1543,56 +1534,56 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         tabela_nao_conforme = html.Div([
             html.P("✅ Nenhum item não conforme encontrado com os filtros atuais.", 
                    style={'textAlign': 'center', 'padding': '10px', 'color': '#27ae60', 'fontSize': '11px'})
-        ], style={'height': '180px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
+        ], style={'height': '100px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
     
     tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)", 
-                           style={'marginTop': '15px', 'marginBottom': '8px', 'color': '#c0392b', 'fontSize': '14px'})
+                           style={'marginTop': '12px', 'marginBottom': '6px', 'color': '#c0392b', 'fontSize': '13px'})
     
-    # ---------- KPIs de PRAZOS dos Itens Não Conformes COMPACTOS ----------
+    # ---------- KPIs de PRAZOS dos Itens Não Conformes SUPER COMPACTOS ----------
     if len(df_nao_conforme) > 0 and (coluna_prazo and coluna_finalizacao):
         kpis_prazos = html.Div([
             html.Div([
-                html.H4("Dentro Prazo", style={'color':'#27ae60','margin':'0', 'fontSize': '10px'}),
-                html.H2(f"{dentro_prazo}", style={'color':'#27ae60','margin':'0', 'fontSize': '18px'}),
+                html.H4("Dentro Prazo", style={'color':'#27ae60','margin':'0', 'fontSize': '9px'}),
+                html.H2(f"{dentro_prazo}", style={'color':'#27ae60','margin':'0', 'fontSize': '16px'}),
                 html.P(f"{(dentro_prazo/len(df_nao_conforme)*100 if len(df_nao_conforme)>0 else 0):.1f}%", 
-                       style={'margin':'0','color':'#27ae60', 'fontSize': '9px'})
-            ], style={'borderLeft':'3px solid #27ae60','borderRadius':'2px','padding':'8px','margin':'3px','flex':'1',
+                       style={'margin':'0','color':'#27ae60', 'fontSize': '8px'})
+            ], style={'borderLeft':'2px solid #27ae60','borderRadius':'2px','padding':'6px','margin':'2px','flex':'1',
                       'backgroundColor':'#d4edda','textAlign':'center','boxShadow':'0 1px 2px rgba(0,0,0,0.05)',
-                      'minWidth': '90px', 'maxWidth': '100px'}),
+                      'minWidth': '80px', 'maxWidth': '90px', 'height': '60px'}),
 
             html.Div([
-                html.H4("Fora Prazo", style={'color':'#e74c3c','margin':'0', 'fontSize': '10px'}),
-                html.H2(f"{fora_prazo}", style={'color':'#e74c3c','margin':'0', 'fontSize': '18px'}),
+                html.H4("Fora Prazo", style={'color':'#e74c3c','margin':'0', 'fontSize': '9px'}),
+                html.H2(f"{fora_prazo}", style={'color':'#e74c3c','margin':'0', 'fontSize': '16px'}),
                 html.P(f"{(fora_prazo/len(df_nao_conforme)*100 if len(df_nao_conforme)>0 else 0):.1f}%", 
-                       style={'margin':'0','color':'#e74c3c', 'fontSize': '9px'})
-            ], style={'borderLeft':'3px solid #e74c3c','borderRadius':'2px','padding':'8px','margin':'3px','flex':'1',
+                       style={'margin':'0','color':'#e74c3c', 'fontSize': '8px'})
+            ], style={'borderLeft':'2px solid #e74c3c','borderRadius':'2px','padding':'6px','margin':'2px','flex':'1',
                       'backgroundColor':'#f8d7da','textAlign':'center','boxShadow':'0 1px 2px rgba(0,0,0,0.05)',
-                      'minWidth': '90px', 'maxWidth': '100px'}),
+                      'minWidth': '80px', 'maxWidth': '90px', 'height': '60px'}),
 
             html.Div([
-                html.H4("Não Concluído", style={'color':'#f39c12','margin':'0', 'fontSize': '10px'}),
-                html.H2(f"{nao_concluido}", style={'color':'#f39c12','margin':'0', 'fontSize': '18px'}),
+                html.H4("Não Concluído", style={'color':'#f39c12','margin':'0', 'fontSize': '9px'}),
+                html.H2(f"{nao_concluido}", style={'color':'#f39c12','margin':'0', 'fontSize': '16px'}),
                 html.P(f"{(nao_concluido/len(df_nao_conforme)*100 if len(df_nao_conforme)>0 else 0):.1f}%", 
-                       style={'margin':'0','color':'#f39c12', 'fontSize': '9px'})
-            ], style={'borderLeft':'3px solid #f39c12','borderRadius':'2px','padding':'8px','margin':'3px','flex':'1',
+                       style={'margin':'0','color':'#f39c12', 'fontSize': '8px'})
+            ], style={'borderLeft':'2px solid #f39c12','borderRadius':'2px','padding':'6px','margin':'2px','flex':'1',
                       'backgroundColor':'#fff3cd','textAlign':'center','boxShadow':'0 1px 2px rgba(0,0,0,0.05)',
-                      'minWidth': '90px', 'maxWidth': '100px'})
-        ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'10px', 'gap': '3px'})
+                      'minWidth': '80px', 'maxWidth': '90px', 'height': '60px'})
+        ], style={'display':'flex','justifyContent':'center','flexWrap':'wrap','marginBottom':'8px', 'gap': '2px'})
         
-        # Adicionar legenda para KPIs de prazo COMPACTA
+        # Adicionar legenda para KPIs de prazo SUPER COMPACTA
         legenda_prazo = html.Div([
             html.P("📊 Status dos Prazos:", 
-                   style={'fontWeight':'bold','marginBottom':'2px', 'fontSize': '10px', 'textAlign': 'center'}),
+                   style={'fontWeight':'bold','marginBottom':'1px', 'fontSize': '9px', 'textAlign': 'center'}),
             html.Div([
-                html.Span("🟢 ", style={'color':'#27ae60','marginRight':'2px', 'fontSize': '9px'}),
-                html.Span("Dentro Prazo", style={'marginRight':'8px','color':'#27ae60', 'fontSize': '9px'}),
-                html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'2px', 'fontSize': '9px'}),
-                html.Span("Fora Prazo", style={'marginRight':'8px','color':'#e74c3c', 'fontSize': '9px'}),
-                html.Span("🟡 ", style={'color':'#f39c12','marginRight':'2px', 'fontSize': '9px'}),
-                html.Span("Não Concluído", style={'color':'#f39c12', 'fontSize': '9px'})
-            ], style={'backgroundColor':'#f8f9fa','padding':'4px 6px','borderRadius':'2px','marginBottom':'6px', 
-                      'fontSize': '9px', 'textAlign': 'center'})
-        ], style={'marginBottom':'10px', 'textAlign': 'center'})
+                html.Span("🟢 ", style={'color':'#27ae60','marginRight':'1px', 'fontSize': '8px'}),
+                html.Span("Dentro Prazo", style={'marginRight':'6px','color':'#27ae60', 'fontSize': '8px'}),
+                html.Span("🔴 ", style={'color':'#e74c3c','marginRight':'1px', 'fontSize': '8px'}),
+                html.Span("Fora Prazo", style={'marginRight':'6px','color':'#e74c3c', 'fontSize': '8px'}),
+                html.Span("🟡 ", style={'color':'#f39c12','marginRight':'1px', 'fontSize': '8px'}),
+                html.Span("Não Concluído", style={'color':'#f39c12', 'fontSize': '8px'})
+            ], style={'backgroundColor':'#f8f9fa','padding':'3px 5px','borderRadius':'2px','marginBottom':'5px', 
+                      'fontSize': '8px', 'textAlign': 'center'})
+        ], style={'marginBottom':'8px', 'textAlign': 'center'})
     else:
         kpis_prazos = html.Div()
         legenda_prazo = html.Div()
@@ -1645,16 +1636,16 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             abas_extra.append(matriz_risco)
         else:
             abas_extra.append(html.Div([
-                html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '14px'}),
+                html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '13px'}),
                 html.P("Nenhum dado encontrado para o ano selecionado.", 
-                       style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '15px', 'fontSize': '11px'})
-            ], style={'marginTop':'15px', 'height': '200px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
+                       style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '15px', 'fontSize': '10px'})
+            ], style={'marginTop':'12px', 'height': '150px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
     else:
         abas_extra.append(html.Div([
-            html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '14px'}),
+            html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '13px'}),
             html.P("Não há dados de risco disponíveis.", 
-                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '15px', 'fontSize': '11px'})
-        ], style={'marginTop':'15px', 'height': '200px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
+                   style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '15px', 'fontSize': '10px'})
+        ], style={'marginTop':'12px', 'height': '150px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
 
     # ---------- Melhorias (8 registros) - MOSTRAR TODOS COMPACTOS ----------
     if df_melhorias is not None and len(df_melhorias) > 0:
@@ -1681,13 +1672,14 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         
         # Calcular altura dinâmica baseada no número de registros
         num_registros = len(df_melhorias_display)
-        altura_tabela = min(250, 100 + (num_registros * 40))  # Máximo 250px, mínimo 100px + 40px por registro
+        # Para poucos registros (8), mostrar tudo com altura automática
+        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
         
         tabela_melhorias = dash_table.DataTable(
             columns=[{"name": col, "id": col} for col in df_melhorias_display.columns],
             data=df_melhorias_display.to_dict('records'),
             page_size=10,  # Mostrar mais registros por página
-            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': f'{altura_tabela}px'},
+            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': altura_tabela},
             style_header={
                 'backgroundColor': '#34495e',
                 'color': 'white',
@@ -1707,8 +1699,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'whiteSpace':'normal',
                 'height':'auto',
                 'fontSize': '9px',
-                'minWidth': '60px',  # Largura mínima maior
-                'maxWidth': '150px', # Largura máxima maior
+                'minWidth': '60px',
+                'maxWidth': '150px',
                 'overflow': 'hidden',
                 'textOverflow': 'ellipsis'
             },
@@ -1716,21 +1708,21 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
                 {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
             ],
-            # Remover paginação para mostrar tudo de uma vez
+            # Remover paginação para mostrar tudo de uma vez para poucos registros
             page_action='none' if num_registros <= 15 else 'native'
         )
         
         container_melhorias = html.Div([
             html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)", 
-                   style={'fontSize': '14px', 'marginBottom': '5px', 'color': '#2c3e50'}),
+                   style={'fontSize': '13px', 'marginBottom': '4px', 'color': '#2c3e50'}),
             html.P("Todos os registros de melhorias (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px'}),
+                   style={'color': '#7f8c8d', 'marginBottom': '6px', 'fontSize': '9px'}),
             tabela_melhorias
         ], style={
-            'marginTop':'15px', 
-            'padding': '10px',
+            'marginTop':'12px', 
+            'padding': '8px',
             'backgroundColor': 'white',
-            'borderRadius': '5px',
+            'borderRadius': '4px',
             'border': '1px solid #dde1e6',
             'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
         })
@@ -1749,7 +1741,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
         
         # Selecionar colunas mais importantes para visualização
-        colunas_prioritarias = ['Nome da Politica', 'Unidade', 'Status', 'Responsavel', 'Unidade', 'Data de Implementação']
+         colunas_prioritarias = ['Nome da Politica', 'Unidade', 'Status', 'Responsavel', 'Unidade', 'Data de Implementação']
         colunas_disponiveis = [col for col in colunas_prioritarias if col in df_politicas_display.columns]
         
         # Adicionar outras colunas se houver espaço
@@ -1761,13 +1753,14 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         
         # Calcular altura dinâmica baseada no número de registros
         num_registros = len(df_politicas_display)
-        altura_tabela = min(250, 100 + (num_registros * 40))  # Máximo 250px, mínimo 100px + 40px por registro
+        # Para poucos registros (7), mostrar tudo com altura automática
+        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
         
         tabela_politicas = dash_table.DataTable(
             columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
             data=df_politicas_display.to_dict('records'),
-            page_size=10,  # Mostrar mais registros por página
-            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': f'{altura_tabela}px'},
+            page_size=10,
+            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': altura_tabela},
             style_header={
                 'backgroundColor': '#34495e',
                 'color': 'white',
@@ -1787,8 +1780,8 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'whiteSpace':'normal',
                 'height':'auto',
                 'fontSize': '9px',
-                'minWidth': '60px',  # Largura mínima maior
-                'maxWidth': '150px', # Largura máxima maior
+                'minWidth': '60px',
+                'maxWidth': '150px',
                 'overflow': 'hidden',
                 'textOverflow': 'ellipsis'
             },
@@ -1796,31 +1789,31 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
                 {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
             ],
-            # Remover paginação para mostrar tudo de uma vez
+            # Remover paginação para mostrar tudo de uma vez para poucos registros
             page_action='none' if num_registros <= 15 else 'native'
         )
         
         container_politicas = html.Div([
             html.H3(f"📑 Políticas ({len(df_politicas)} registros)", 
-                   style={'fontSize': '14px', 'marginBottom': '5px', 'color': '#2c3e50'}),
+                   style={'fontSize': '13px', 'marginBottom': '4px', 'color': '#2c3e50'}),
             html.P("Todos os registros de políticas (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px'}),
+                   style={'color': '#7f8c8d', 'marginBottom': '6px', 'fontSize': '9px'}),
             tabela_politicas
         ], style={
-            'marginTop':'15px', 
-            'padding': '10px',
+            'marginTop':'12px', 
+            'padding': '8px',
             'backgroundColor': 'white',
-            'borderRadius': '5px',
+            'borderRadius': '4px',
             'border': '1px solid #dde1e6',
             'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
         })
         abas_extra.append(container_politicas)
 
-    # ---------- Layout Final COMPACTO com todas as seções ----------
+    # ---------- Layout Final SUPER COMPACTO ----------
     return html.Div([
         html.Div([
             html.H4(f"📊 Resumo - {len(df)} itens auditados", 
-                    style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '10px', 'fontSize': '16px'})
+                    style={'textAlign': 'center', 'color': '#2c3e50', 'marginBottom': '8px', 'fontSize': '14px'})
         ]),
         kpis,
         tabela_titulo,
@@ -1829,27 +1822,25 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         tabela_nao_conforme,
         *abas_extra
     ], style={
-        'fontSize': '11px',
+        'fontSize': '10px',
         'display': 'flex',
         'flexDirection': 'column',
-        'gap': '15px'  # Espaço uniforme entre todas as seções
+        'gap': '10px'  # Espaço reduzido entre todas as seções
     })
 
 # ========== EXECUÇÃO DO APP ==========
 if __name__ == '__main__':
     print("\n" + "="*50)
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
-    print("📊 DASHBOARD COMPACTO COM TODAS AS INFORMAÇÕES:")
-    print("  - ✅ Matriz de risco com TODAS as siglas visíveis")
-    print("  - ✅ Tabelas de Melhorias (8 registros) mostrando tudo")
-    print("  - ✅ Tabelas de Políticas (7 registros) mostrando tudo")
-    print("  - ✅ Layout otimizado para caber tudo na página")
-    print("  - ✅ Alturas dinâmicas baseadas no número de registros")
-    print("  - ✅ Fontes compactas (9px-10px) para mais conteúdo")
-    print("  - ✅ Sem cortes nas siglas ou informações")
+    print("📊 DASHBOARD OTIMIZADO:")
+    print("  - ✅ KPIs mais compactos (espaçamento reduzido)")
+    print("  - ✅ Tabela de Não Conformes maior (300px de altura)")
+    print("  - ✅ Legenda de siglas compacta (uma ao lado da outra)")
+    print("  - ✅ Tabelas de Melhorias e Políticas mostrando tudo")
+    print("  - ✅ Fontes reduzidas para otimizar espaço")
+    print("  - ✅ Layout mais compacto geral")
     print("="*50)
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
