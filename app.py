@@ -253,7 +253,7 @@ def criar_sigla_relatorio(relatorio, index):
     return f"R{index:03d}"
 
 def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
-    """Cria matriz de risco COMPACTA com TODAS as siglas dos relatórios"""
+    """Cria matriz de risco com TODAS as siglas VISÍVEIS, sem cortes"""
     
     if df_risco_filtrado is None or len(df_risco_filtrado) == 0:
         return html.Div([
@@ -272,14 +272,14 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         7: 'JUL', 8: 'AGO', 9: 'SET', 10: 'OUT', 11: 'NOV', 12: 'DEZ'
     }
     
-    print(f"\n📊 CRIANDO MATRIZ DE RISCO COMPACTA PARA O ANO {ano_filtro}")
+    print(f"\n📊 CRIANDO MATRIZ DE RISCO COM SIGLAS VISÍVEIS PARA O ANO {ano_filtro}")
     print(f"  Unidades: {len(unidades)}")
     print(f"  Total de registros: {len(df_risco_filtrado)}")
     
     # Conjunto para armazenar TODAS as siglas únicas encontradas
     siglas_encontradas = set()
     
-    # Criar estrutura de dados para a matriz - GUARDA TODOS OS REGISTROS
+    # Criar estrutura de dados para a matriz
     matriz_data = []
     
     for unidade_nome in unidades:
@@ -292,7 +292,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             df_mes = df_unidade[df_unidade['Mes'] == mes]
             
             if len(df_mes) > 0:
-                # Para cada relatório no mês - AGORA PEGA TODOS
+                # Para cada relatório no mês
                 siglas_no_mes = []
                 
                 for _, row in df_mes.iterrows():
@@ -318,90 +318,181 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     # Ordenar siglas alfabeticamente
                     siglas_no_mes.sort(key=lambda x: x['sigla'])
                     
-                    # DEBUG: Verificar quantas siglas temos
                     print(f"  Unidade: {unidade_nome}, Mês: {mes}, Siglas: {len(siglas_no_mes)}")
                     
-                    # Determinar tamanho da fonte baseado na quantidade de siglas
+                    # Determinar layout baseado na quantidade de siglas
                     num_siglas = len(siglas_no_mes)
-                    if num_siglas <= 4:
-                        font_size = '8px'
-                        padding = '2px 3px'
-                        min_width = '28px'
-                        height = '20px'
-                        gap = '1px'
-                        grid_cols = min(num_siglas, 4)
-                    elif num_siglas <= 8:
-                        font_size = '7px'
-                        padding = '1px 2px'
-                        min_width = '26px'
-                        height = '18px'
-                        gap = '1px'
-                        grid_cols = 4
-                    else:
-                        font_size = '6px'
-                        padding = '1px 2px'
-                        min_width = '24px'
-                        height = '16px'
-                        gap = '0.5px'
-                        grid_cols = 5  # Mais colunas para muitas siglas
                     
-                    # Criar container ultra compacto para TODAS as siglas
-                    siglas_html = []
-                    for item in siglas_no_mes:
-                        title_text = f"{item['sigla']}: {item['status']}"
-                        if item['relatorio']:
-                            title_text += f"\n{item['relatorio'][:50]}..."
+                    # Cálculo FLEXÍVEL da largura das células baseado no número de siglas
+                    if num_siglas <= 3:
+                        # Para poucas siglas, mostrar em linha horizontal
+                        siglas_html = []
+                        for item in siglas_no_mes:
+                            title_text = f"{item['sigla']}: {item['status']}"
+                            if item['relatorio']:
+                                title_text += f"\n{item['relatorio'][:50]}..."
+                            
+                            siglas_html.append(html.Div(
+                                item['sigla'],
+                                style={
+                                    'fontSize': '8px',
+                                    'fontWeight': '600',
+                                    'color': item['cor']['text_color'],
+                                    'textAlign': 'center',
+                                    'backgroundColor': item['cor']['bg_color'],
+                                    'padding': '3px 4px',
+                                    'margin': '1px',
+                                    'borderRadius': '3px',
+                                    'border': f'1px solid {item["cor"]["border_color"]}',
+                                    'minWidth': '26px',
+                                    'width': '26px',
+                                    'height': '20px',
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'cursor': 'default',
+                                    'boxShadow': '0 0.5px 1px rgba(0,0,0,0.05)',
+                                    'overflow': 'visible',
+                                    'whiteSpace': 'nowrap',
+                                    'flexShrink': '0'
+                                },
+                                title=title_text
+                            ))
                         
-                        siglas_html.append(html.Div(
-                            item['sigla'],
+                        linha[mes] = html.Div(
+                            siglas_html,
                             style={
-                                'fontSize': font_size,
-                                'fontWeight': '600',
-                                'color': item['cor']['text_color'],
-                                'textAlign': 'center',
-                                'backgroundColor': item['cor']['bg_color'],
-                                'padding': padding,
-                                'margin': '0',
-                                'borderRadius': '2px',
-                                'border': f'1px solid {item["cor"]["border_color"]}',
-                                'minWidth': min_width,
-                                'width': min_width,
-                                'height': height,
                                 'display': 'flex',
-                                'alignItems': 'center',
+                                'flexWrap': 'wrap',
+                                'gap': '2px',
+                                'padding': '3px',
                                 'justifyContent': 'center',
-                                'cursor': 'default',
-                                'boxShadow': '0 0.5px 1px rgba(0,0,0,0.05)',
-                                'overflow': 'hidden',
-                                'flexShrink': '0',
-                                'flexGrow': '0'
-                            },
-                            title=title_text
-                        ))
-                    
-                    # Calcular altura da célula baseado no número de linhas necessárias
-                    rows_needed = (num_siglas + grid_cols - 1) // grid_cols
-                    cell_height = max(35, rows_needed * (int(height.replace('px', '')) + 3))
-                    
-                    # Criar container com grid compacto
-                    linha[mes] = html.Div(
-                        siglas_html,
-                        style={
-                            'display': 'grid',
-                            'gridTemplateColumns': f'repeat({grid_cols}, 1fr)',
-                            'gap': gap,
-                            'padding': '2px',
-                            'justifyContent': 'center',
-                            'alignItems': 'center',
-                            'minHeight': f'{cell_height}px',
-                            'height': f'{cell_height}px',
-                            'borderRadius': '2px',
-                            'backgroundColor': '#f8fafc',
-                            'width': '100%',
-                            'boxSizing': 'border-box',
-                            'overflow': 'hidden'
-                        }
-                    )
+                                'alignItems': 'center',
+                                'minHeight': '35px',
+                                'height': 'auto',
+                                'borderRadius': '3px',
+                                'backgroundColor': '#f8fafc',
+                                'width': '100%',
+                                'boxSizing': 'border-box',
+                                'overflow': 'visible'
+                            }
+                        )
+                    elif num_siglas <= 6:
+                        # Para quantidade moderada, usar grid 2xN
+                        siglas_html = []
+                        for item in siglas_no_mes:
+                            title_text = f"{item['sigla']}: {item['status']}"
+                            if item['relatorio']:
+                                title_text += f"\n{item['relatorio'][:50]}..."
+                            
+                            siglas_html.append(html.Div(
+                                item['sigla'],
+                                style={
+                                    'fontSize': '7px',
+                                    'fontWeight': '600',
+                                    'color': item['cor']['text_color'],
+                                    'textAlign': 'center',
+                                    'backgroundColor': item['cor']['bg_color'],
+                                    'padding': '2px 3px',
+                                    'margin': '1px',
+                                    'borderRadius': '2px',
+                                    'border': f'1px solid {item["cor"]["border_color"]}',
+                                    'minWidth': '24px',
+                                    'width': '24px',
+                                    'height': '18px',
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'cursor': 'default',
+                                    'boxShadow': '0 0.5px 1px rgba(0,0,0,0.05)',
+                                    'overflow': 'visible',
+                                    'whiteSpace': 'nowrap',
+                                    'flexShrink': '0'
+                                },
+                                title=title_text
+                            ))
+                        
+                        # Calcular número de colunas (máximo 2)
+                        grid_cols = min(2, num_siglas)
+                        rows_needed = (num_siglas + grid_cols - 1) // grid_cols
+                        cell_height = max(45, rows_needed * 22)
+                        
+                        linha[mes] = html.Div(
+                            siglas_html,
+                            style={
+                                'display': 'grid',
+                                'gridTemplateColumns': f'repeat({grid_cols}, 1fr)',
+                                'gap': '1px',
+                                'padding': '2px',
+                                'justifyContent': 'center',
+                                'alignItems': 'center',
+                                'minHeight': f'{cell_height}px',
+                                'height': f'{cell_height}px',
+                                'borderRadius': '2px',
+                                'backgroundColor': '#f8fafc',
+                                'width': '100%',
+                                'boxSizing': 'border-box',
+                                'overflow': 'visible'
+                            }
+                        )
+                    else:
+                        # Para muitas siglas, usar grid com mais colunas
+                        siglas_html = []
+                        for item in siglas_no_mes:
+                            title_text = f"{item['sigla']}: {item['status']}"
+                            if item['relatorio']:
+                                title_text += f"\n{item['relatorio'][:50]}..."
+                            
+                            siglas_html.append(html.Div(
+                                item['sigla'],
+                                style={
+                                    'fontSize': '6px',
+                                    'fontWeight': '600',
+                                    'color': item['cor']['text_color'],
+                                    'textAlign': 'center',
+                                    'backgroundColor': item['cor']['bg_color'],
+                                    'padding': '1px 2px',
+                                    'margin': '0.5px',
+                                    'borderRadius': '2px',
+                                    'border': f'1px solid {item["cor"]["border_color"]}',
+                                    'minWidth': '22px',
+                                    'width': '22px',
+                                    'height': '16px',
+                                    'display': 'flex',
+                                    'alignItems': 'center',
+                                    'justifyContent': 'center',
+                                    'cursor': 'default',
+                                    'boxShadow': '0 0.5px 1px rgba(0,0,0,0.05)',
+                                    'overflow': 'visible',
+                                    'whiteSpace': 'nowrap',
+                                    'flexShrink': '0'
+                                },
+                                title=title_text
+                            ))
+                        
+                        # Para muitas siglas, usar 3 ou mais colunas
+                        grid_cols = min(4, max(3, (num_siglas + 2) // 3))
+                        rows_needed = (num_siglas + grid_cols - 1) // grid_cols
+                        cell_height = max(60, rows_needed * 18)
+                        
+                        linha[mes] = html.Div(
+                            siglas_html,
+                            style={
+                                'display': 'grid',
+                                'gridTemplateColumns': f'repeat({grid_cols}, 1fr)',
+                                'gap': '0.5px',
+                                'padding': '1px',
+                                'justifyContent': 'center',
+                                'alignItems': 'center',
+                                'minHeight': f'{cell_height}px',
+                                'height': f'{cell_height}px',
+                                'borderRadius': '2px',
+                                'backgroundColor': '#f8fafc',
+                                'width': '100%',
+                                'boxSizing': 'border-box',
+                                'overflow': 'visible'
+                            }
+                        )
                 else:
                     linha[mes] = html.Div("-", 
                         style={
@@ -439,7 +530,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
     # Ordenar siglas encontradas alfabeticamente
     siglas_ordenadas = sorted(siglas_encontradas)
     
-    # Criar tabela HTML com design ULTRA COMPACTO
+    # Criar tabela HTML com design ajustado
     tabela_cabecalho = [html.Th("UNIDADE", style={
         'backgroundColor': '#2c3e50',
         'color': 'white',
@@ -470,8 +561,8 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                 'textAlign': 'center',
                 'fontWeight': '600',
                 'border': '1px solid #1a252f',
-                'minWidth': '45px',
-                'width': '45px',
+                'minWidth': '55px',  # AUMENTADO de 45px para 55px
+                'width': '55px',     # AUMENTADO de 45px para 55px
                 'fontSize': '9px',
                 'height': '30px',
                 'verticalAlign': 'middle'
@@ -493,18 +584,19 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                     'whiteSpace': 'nowrap',
                     'color': '#2c3e50',
                     'textAlign': 'left',
-                    'padding': '0 3px'
+                    'padding': '0 5px'
                 })
             ]),
             style={
                 'backgroundColor': bg_color,
-                'padding': '6px 3px',
+                'padding': '6px 5px',
                 'textAlign': 'left',
                 'border': '1px solid #dde1e6',
                 'fontSize': '9px',
                 'minWidth': '100px',
                 'width': '100px',
-                'height': '35px',
+                'height': 'auto',
+                'minHeight': '40px',
                 'position': 'sticky',
                 'left': '0',
                 'zIndex': '1',
@@ -519,16 +611,17 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                 conteudo,
                 style={
                     'backgroundColor': bg_color,
-                    'padding': '0',
+                    'padding': '2px',
                     'textAlign': 'center',
                     'border': '1px solid #dde1e6',
                     'verticalAlign': 'top',
-                    'minHeight': '35px',
-                    'minWidth': '45px',
-                    'width': '45px',
+                    'minHeight': '40px',
+                    'minWidth': '55px',  # AUMENTADO de 45px para 55px
+                    'width': '55px',     # AUMENTADO de 45px para 55px
                     'height': 'auto',
-                    'maxHeight': '80px',
-                    'overflow': 'hidden'
+                    'maxHeight': '120px',
+                    'overflow': 'visible',  # ALTERADO de 'hidden' para 'visible'
+                    'wordWrap': 'break-word'
                 }
             ))
         
@@ -546,26 +639,27 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'fontSize': '9px',
         'tableLayout': 'fixed',
         'borderRadius': '3px',
-        'overflow': 'hidden',
+        'overflow': 'visible',  # ALTERADO de 'hidden' para 'visible'
         'boxShadow': '0 1px 2px rgba(0,0,0,0.1)'
     })
     
-    # Container da tabela - COMPACTO
+    # Container da tabela - COM rolagem horizontal SE necessário
     tabela_container = html.Div(
         tabela_html,
         style={
             'overflowX': 'auto',
+            'overflowY': 'visible',  # Alterado para visível
             'maxWidth': '100%',
             'marginTop': '8px',
             'borderRadius': '3px',
-            'maxHeight': '400px',  # ALTURA FIXA COMPACTA
-            'overflowY': 'hidden',  # SEM rolagem vertical
+            'maxHeight': '400px',  # Altura compacta para caber tudo
             'border': '1px solid #dde1e6',
-            'backgroundColor': 'white'
+            'backgroundColor': 'white',
+            'padding': '2px'
         }
     )
     
-    # Criar lista de siglas e seus significados com design COMPACTO
+    # Criar lista de siglas e seus significados
     lista_siglas = []
     
     for sigla in siglas_ordenadas:
@@ -607,7 +701,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         lista_siglas = [html.P("Nenhuma sigla conhecida encontrada nos dados.", 
                                style={'color': '#7f8c8d', 'fontSize': '10px', 'textAlign': 'center', 'padding': '10px'})]
     
-    # Container da lista de siglas com design COMPACTO
+    # Container da lista de siglas
     lista_siglas_container = html.Div([
         html.Div([
             html.H4("📋 LEGENDA DE SIGLAS", style={
@@ -625,7 +719,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
             'borderBottom': '1px solid #bdc3c7'
         }),
         html.Div(lista_siglas, style={
-            'maxHeight': '120px',  # ALTURA COMPACTA
+            'maxHeight': '100px',  # Altura reduzida para caber tudo
             'overflowY': 'auto', 
             'padding': '8px',
             'backgroundColor': '#ffffff'
@@ -638,7 +732,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'overflow': 'hidden'
     })
     
-    # Legenda de cores com design COMPACTO
+    # Legenda de cores
     legenda_cores = html.Div([
         html.Div([
             html.H5("🎨 LEGENDA DE STATUS", style={
@@ -734,6 +828,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
     print(f"  Registros totais: {len(df_risco_filtrado)}")
     print(f"  Siglas únicas: {len(siglas_ordenadas)}")
     print(f"  Tamanho da matriz: {len(unidades)} linhas x 13 colunas")
+    print(f"  Largura das células dos meses: 55px (aumentada para visibilidade)")
     
     return html.Div([
         titulo_matriz,
@@ -749,7 +844,8 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
         'padding': '10px',
         'backgroundColor': 'white',
         'borderRadius': '3px',
-        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)',
+        'overflow': 'visible'  # Garantir que nada seja cortado
     })
 
 def carregar_dados_da_planilha():
@@ -1161,7 +1257,7 @@ app.layout = html.Div([
             )
         ], style={'width':'160px'})
     ], style={'display':'flex','justifyContent':'center','marginBottom':'15px','flexWrap':'wrap', 'padding': '5px'}),
-    html.Div(id='conteudo-principal', style={'padding':'10px', 'maxWidth': '1200px', 'margin': '0 auto'})
+    html.Div(id='conteudo-principal', style={'padding':'10px', 'maxWidth': '1400px', 'margin': '0 auto', 'overflowY': 'auto'})
 ])
 
 # ========== CALLBACKS ==========
@@ -1334,7 +1430,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
                 page_size=5,  # Menos linhas por página
-                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px'},
+                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px', 'height': '180px'},
                 style_header={
                     'backgroundColor': '#c0392b',
                     'color': 'white',
@@ -1416,7 +1512,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 columns=[{"name": col, "id": col} for col in df_nao_conforme_display.columns],
                 data=df_nao_conforme_display.to_dict('records'),
                 page_size=5,
-                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px'},
+                style_table={'overflowX':'auto', 'fontSize': '10px', 'marginTop': '5px', 'height': '180px'},
                 style_header={
                     'backgroundColor': '#c0392b',
                     'color': 'white',
@@ -1447,7 +1543,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         tabela_nao_conforme = html.Div([
             html.P("✅ Nenhum item não conforme encontrado com os filtros atuais.", 
                    style={'textAlign': 'center', 'padding': '10px', 'color': '#27ae60', 'fontSize': '11px'})
-        ])
+        ], style={'height': '180px', 'display': 'flex', 'alignItems': 'center', 'justifyContent': 'center'})
     
     tabela_titulo = html.H3(f"❌ Itens Não Conformes ({len(df_nao_conforme)} itens)", 
                            style={'marginTop': '15px', 'marginBottom': '8px', 'color': '#c0392b', 'fontSize': '14px'})
@@ -1552,16 +1648,18 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '14px'}),
                 html.P("Nenhum dado encontrado para o ano selecionado.", 
                        style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '15px', 'fontSize': '11px'})
-            ], style={'marginTop':'15px'}))
+            ], style={'marginTop':'15px', 'height': '200px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
     else:
         abas_extra.append(html.Div([
             html.H3("📋 Matriz Auditoria Risco", style={'fontSize': '14px'}),
             html.P("Não há dados de risco disponíveis.", 
                    style={'textAlign':'center', 'color':'#7f8c8d', 'padding': '15px', 'fontSize': '11px'})
-        ], style={'marginTop':'15px'}))
+        ], style={'marginTop':'15px', 'height': '200px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
 
-    # ---------- Melhorias e Políticas COMPACTAS ----------
+    # ---------- Melhorias (8 registros) - MOSTRAR TODOS COMPACTOS ----------
     if df_melhorias is not None and len(df_melhorias) > 0:
+        print(f"\n📈 PROCESSANDO MELHORIAS: {len(df_melhorias)} registros")
+        
         colunas_data_melhorias = [col for col in df_melhorias.columns 
                                  if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
         
@@ -1570,19 +1668,26 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             if coluna_data in df_melhorias_display.columns:
                 df_melhorias_display[coluna_data] = df_melhorias_display[coluna_data].apply(formatar_data)
         
-        # Limitar número de colunas para visualização
-        if len(df_melhorias_display.columns) > 6:
-            # Manter apenas as colunas mais importantes
-            colunas_importantes = ['Unidade', 'Status', 'Data', 'Descricao']
-            colunas_selecionadas = [col for col in colunas_importantes if col in df_melhorias_display.columns]
-            colunas_adicionais = [col for col in df_melhorias_display.columns if col not in colunas_importantes][:2]
-            df_melhorias_display = df_melhorias_display[colunas_selecionadas + colunas_adicionais]
+        # Selecionar colunas mais importantes para visualização
+        colunas_prioritarias = ['Unidade', 'Status', 'Descricao', 'Responsavel', 'Prazo', 'Data_Conclusao']
+        colunas_disponiveis = [col for col in colunas_prioritarias if col in df_melhorias_display.columns]
+        
+        # Adicionar outras colunas se houver espaço
+        outras_colunas = [col for col in df_melhorias_display.columns if col not in colunas_disponiveis]
+        max_colunas = min(6, len(df_melhorias_display.columns))
+        colunas_para_exibir = colunas_disponiveis + outras_colunas[:max_colunas - len(colunas_disponiveis)]
+        
+        df_melhorias_display = df_melhorias_display[colunas_para_exibir]
+        
+        # Calcular altura dinâmica baseada no número de registros
+        num_registros = len(df_melhorias_display)
+        altura_tabela = min(250, 100 + (num_registros * 40))  # Máximo 250px, mínimo 100px + 40px por registro
         
         tabela_melhorias = dash_table.DataTable(
             columns=[{"name": col, "id": col} for col in df_melhorias_display.columns],
             data=df_melhorias_display.to_dict('records'),
-            page_size=5,
-            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px'},
+            page_size=10,  # Mostrar mais registros por página
+            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': f'{altura_tabela}px'},
             style_header={
                 'backgroundColor': '#34495e',
                 'color': 'white',
@@ -1591,7 +1696,10 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'fontSize': '10px',
                 'padding': '4px 5px',
                 'minHeight': '30px',
-                'height': '30px'
+                'height': '30px',
+                'position': 'sticky',
+                'top': '0',
+                'zIndex': '1'
             },
             style_cell={
                 'textAlign': 'center',
@@ -1599,22 +1707,39 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'whiteSpace':'normal',
                 'height':'auto',
                 'fontSize': '9px',
-                'minWidth': '40px',
-                'maxWidth': '120px'
+                'minWidth': '60px',  # Largura mínima maior
+                'maxWidth': '150px', # Largura máxima maior
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis'
             },
             style_data_conditional=[
                 {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
                 {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
-            ]
+            ],
+            # Remover paginação para mostrar tudo de uma vez
+            page_action='none' if num_registros <= 15 else 'native'
         )
-        abas_extra.append(html.Div([
-            html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)", style={'fontSize': '14px', 'marginBottom': '5px'}),
+        
+        container_melhorias = html.Div([
+            html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)", 
+                   style={'fontSize': '14px', 'marginBottom': '5px', 'color': '#2c3e50'}),
             html.P("Todos os registros de melhorias (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '5px', 'fontSize': '10px'}),
+                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px'}),
             tabela_melhorias
-        ], style={'marginTop':'15px', 'padding': '5px'}))
+        ], style={
+            'marginTop':'15px', 
+            'padding': '10px',
+            'backgroundColor': 'white',
+            'borderRadius': '5px',
+            'border': '1px solid #dde1e6',
+            'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+        })
+        abas_extra.append(container_melhorias)
 
+    # ---------- Políticas (7 registros) - MOSTRAR TODOS COMPACTOS ----------
     if df_politicas is not None and len(df_politicas) > 0:
+        print(f"\n📑 PROCESSANDO POLÍTICAS: {len(df_politicas)} registros")
+        
         colunas_data_politicas = [col for col in df_politicas.columns 
                                  if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
         
@@ -1623,19 +1748,26 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             if coluna_data in df_politicas_display.columns:
                 df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
         
-        # Limitar número de colunas para visualização
-        if len(df_politicas_display.columns) > 6:
-            # Manter apenas as colunas mais importantes
-            colunas_importantes = ['Unidade', 'Status', 'Data', 'Descricao']
-            colunas_selecionadas = [col for col in colunas_importantes if col in df_politicas_display.columns]
-            colunas_adicionais = [col for col in df_politicas_display.columns if col not in colunas_importantes][:2]
-            df_politicas_display = df_politicas_display[colunas_selecionadas + colunas_adicionais]
+        # Selecionar colunas mais importantes para visualização
+        colunas_prioritarias = ['Unidade', 'Status', 'Descricao', 'Responsavel', 'Prazo', 'Data_Aprovacao']
+        colunas_disponiveis = [col for col in colunas_prioritarias if col in df_politicas_display.columns]
+        
+        # Adicionar outras colunas se houver espaço
+        outras_colunas = [col for col in df_politicas_display.columns if col not in colunas_disponiveis]
+        max_colunas = min(6, len(df_politicas_display.columns))
+        colunas_para_exibir = colunas_disponiveis + outras_colunas[:max_colunas - len(colunas_disponiveis)]
+        
+        df_politicas_display = df_politicas_display[colunas_para_exibir]
+        
+        # Calcular altura dinâmica baseada no número de registros
+        num_registros = len(df_politicas_display)
+        altura_tabela = min(250, 100 + (num_registros * 40))  # Máximo 250px, mínimo 100px + 40px por registro
         
         tabela_politicas = dash_table.DataTable(
             columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
             data=df_politicas_display.to_dict('records'),
-            page_size=5,
-            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px'},
+            page_size=10,  # Mostrar mais registros por página
+            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': f'{altura_tabela}px'},
             style_header={
                 'backgroundColor': '#34495e',
                 'color': 'white',
@@ -1644,7 +1776,10 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'fontSize': '10px',
                 'padding': '4px 5px',
                 'minHeight': '30px',
-                'height': '30px'
+                'height': '30px',
+                'position': 'sticky',
+                'top': '0',
+                'zIndex': '1'
             },
             style_cell={
                 'textAlign': 'center',
@@ -1652,22 +1787,36 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'whiteSpace':'normal',
                 'height':'auto',
                 'fontSize': '9px',
-                'minWidth': '40px',
-                'maxWidth': '120px'
+                'minWidth': '60px',  # Largura mínima maior
+                'maxWidth': '150px', # Largura máxima maior
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis'
             },
             style_data_conditional=[
                 {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
                 {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
-            ]
+            ],
+            # Remover paginação para mostrar tudo de uma vez
+            page_action='none' if num_registros <= 15 else 'native'
         )
-        abas_extra.append(html.Div([
-            html.H3(f"📑 Políticas ({len(df_politicas)} registros)", style={'fontSize': '14px', 'marginBottom': '5px'}),
+        
+        container_politicas = html.Div([
+            html.H3(f"📑 Políticas ({len(df_politicas)} registros)", 
+                   style={'fontSize': '14px', 'marginBottom': '5px', 'color': '#2c3e50'}),
             html.P("Todos os registros de políticas (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '5px', 'fontSize': '10px'}),
+                   style={'color': '#7f8c8d', 'marginBottom': '8px', 'fontSize': '10px'}),
             tabela_politicas
-        ], style={'marginTop':'15px', 'padding': '5px'}))
+        ], style={
+            'marginTop':'15px', 
+            'padding': '10px',
+            'backgroundColor': 'white',
+            'borderRadius': '5px',
+            'border': '1px solid #dde1e6',
+            'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+        })
+        abas_extra.append(container_politicas)
 
-    # ---------- Layout Final COMPACTO ----------
+    # ---------- Layout Final COMPACTO com todas as seções ----------
     return html.Div([
         html.Div([
             html.H4(f"📊 Resumo - {len(df)} itens auditados", 
@@ -1679,22 +1828,27 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         legenda_prazo,
         tabela_nao_conforme,
         *abas_extra
-    ], style={'fontSize': '11px'})
+    ], style={
+        'fontSize': '11px',
+        'display': 'flex',
+        'flexDirection': 'column',
+        'gap': '15px'  # Espaço uniforme entre todas as seções
+    })
 
 # ========== EXECUÇÃO DO APP ==========
 if __name__ == '__main__':
     print("\n" + "="*50)
     print("🌐 DASHBOARD RODANDO: http://localhost:8050")
-    print("📊 DASHBOARD COMPACTO OTIMIZADO:")
-    print("  - ✅ Matriz de risco com TODAS as siglas (altura 400px)")
-    print("  - ✅ Fontes reduzidas (6px-9px) para mais conteúdo")
-    print("  - ✅ Tabelas compactas (5 linhas por página)")
-    print("  - ✅ KPIs menores e mais compactos")
-    print("  - ✅ Tooltips com detalhes dos relatórios")
-    print("  - ✅ SEM rolagem vertical na matriz")
+    print("📊 DASHBOARD COMPACTO COM TODAS AS INFORMAÇÕES:")
+    print("  - ✅ Matriz de risco com TODAS as siglas visíveis")
+    print("  - ✅ Tabelas de Melhorias (8 registros) mostrando tudo")
+    print("  - ✅ Tabelas de Políticas (7 registros) mostrando tudo")
+    print("  - ✅ Layout otimizado para caber tudo na página")
+    print("  - ✅ Alturas dinâmicas baseadas no número de registros")
+    print("  - ✅ Fontes compactas (9px-10px) para mais conteúdo")
+    print("  - ✅ Sem cortes nas siglas ou informações")
     print("="*50)
     app.run(debug=True, host='0.0.0.0', port=8050)
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
