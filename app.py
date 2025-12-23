@@ -1,4 +1,4 @@
-                from dash import Dash, html, dcc, Input, Output, dash_table
+from dash import Dash, html, dcc, Input, Output, dash_table
 import pandas as pd
 import plotly.express as px
 import os
@@ -1697,3 +1697,4 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
