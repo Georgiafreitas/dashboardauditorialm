@@ -1729,90 +1729,103 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         abas_extra.append(container_melhorias)
 
     # ---------- Políticas (7 registros) - MOSTRAR TODOS COMPACTOS ----------
-    if df_politicas is not None and len(df_politicas) > 0:
-        print(f"\n📑 PROCESSANDO POLÍTICAS: {len(df_politicas)} registros")
-        
-        colunas_data_politicas = [col for col in df_politicas.columns 
-                                 if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])]
-        
-        df_politicas_display = df_politicas.copy()
-        for coluna_data in colunas_data_politicas:
-            if coluna_data in df_politicas_display.columns:
-                df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
-        
-        # Selecionar APENAS as colunas prioritárias existentes
-colunas_prioritarias = [
-    'Nome da Politica',
-    'Unidade',
-    'Status',
-    'Responsavel',
-    'Data de Implementação'
-]
+   if df_politicas is not None and len(df_politicas) > 0:
+    print(f"\n📑 PROCESSANDO POLÍTICAS: {len(df_politicas)} registros")
 
-colunas_para_exibir = [
-    col for col in colunas_prioritarias
-    if col in df_politicas_display.columns
-]
+    # Identificar colunas de data para formatação
+    colunas_data_politicas = [
+        col for col in df_politicas.columns
+        if any(termo in col.lower() for termo in [
+            'data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'
+        ])
+    ]
 
-df_politicas_display = df_politicas_display[colunas_para_exibir]
-        
-        # Calcular altura dinâmica baseada no número de registros
-        num_registros = len(df_politicas_display)
-        # Para poucos registros (7), mostrar tudo com altura automática
-        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
-        
-        tabela_politicas = dash_table.DataTable(
-            columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
-            data=df_politicas_display.to_dict('records'),
-            page_size=10,
-            style_table={'overflowX':'auto','marginTop':'5px', 'fontSize': '10px', 'height': altura_tabela},
-            style_header={
-                'backgroundColor': '#34495e',
-                'color': 'white',
-                'fontWeight': 'bold',
-                'textAlign':'center',
-                'fontSize': '10px',
-                'padding': '4px 5px',
-                'minHeight': '30px',
-                'height': '30px',
-                'position': 'sticky',
-                'top': '0',
-                'zIndex': '1'
-            },
-            style_cell={
-                'textAlign': 'center',
-                'padding': '3px 4px',
-                'whiteSpace':'normal',
-                'height':'auto',
-                'fontSize': '9px',
-                'minWidth': '60px',
-                'maxWidth': '150px',
-                'overflow': 'hidden',
-                'textOverflow': 'ellipsis'
-            },
-            style_data_conditional=[
-                {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
-                {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
-            ],
-            # Remover paginação para mostrar tudo de uma vez para poucos registros
-            page_action='none' if num_registros <= 15 else 'native'
-        )
-        
-        container_politicas = html.Div([
-            html.H3(f"📑 Políticas ({len(df_politicas)} registros)", 
-                   style={'fontSize': '13px', 'marginBottom': '4px', 'color': '#2c3e50'}),
-            html.P("Todos os registros de políticas (filtros não aplicados)", 
-                   style={'color': '#7f8c8d', 'marginBottom': '6px', 'fontSize': '9px'}),
-            tabela_politicas
-        ], style={
-            'marginTop':'12px', 
-            'padding': '8px',
-            'backgroundColor': 'white',
-            'borderRadius': '4px',
-            'border': '1px solid #dde1e6',
-            'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
-        })
-        abas_extra.append(container_politicas)
+    df_politicas_display = df_politicas.copy()
+
+    # Formatar datas
+    for coluna_data in colunas_data_politicas:
+        if coluna_data in df_politicas_display.columns:
+            df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
+
+    # 🔥 COLUNAS QUE DEVEM APARECER (EXATAMENTE ESTAS)
+    colunas_prioritarias = [
+        'Nome da Politica',
+        'Status',
+        'Responsavel',
+        'Unidade',
+        'Data de Implementação'
+    ]
+
+    # Selecionar SOMENTE as colunas prioritárias existentes
+    df_politicas_display = df_politicas_display[
+        [col for col in colunas_prioritarias if col in df_politicas_display.columns]
+    ]
+
+    # Altura dinâmica da tabela
+    num_registros = len(df_politicas_display)
+    altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
+
+    tabela_politicas = dash_table.DataTable(
+        columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
+        data=df_politicas_display.to_dict('records'),
+        page_size=10,
+        style_table={
+            'overflowX': 'auto',
+            'marginTop': '5px',
+            'fontSize': '10px',
+            'height': altura_tabela
+        },
+        style_header={
+            'backgroundColor': '#34495e',
+            'color': 'white',
+            'fontWeight': 'bold',
+            'textAlign': 'center',
+            'fontSize': '10px',
+            'padding': '4px 5px',
+            'minHeight': '30px',
+            'height': '30px',
+            'position': 'sticky',
+            'top': '0',
+            'zIndex': '1'
+        },
+        style_cell={
+            'textAlign': 'center',
+            'padding': '3px 4px',
+            'whiteSpace': 'normal',
+            'height': 'auto',
+            'fontSize': '9px',
+            'minWidth': '60px',
+            'maxWidth': '200px',
+            'overflow': 'hidden',
+            'textOverflow': 'ellipsis'
+        },
+        style_data_conditional=[
+            {'if': {'row_index': 'odd'}, 'backgroundColor': '#ecf0f1'},
+            {'if': {'row_index': 'even'}, 'backgroundColor': 'white'}
+        ],
+        page_action='none' if num_registros <= 15 else 'native'
+    )
+
+    container_politicas = html.Div([
+        html.H3(
+            f"📑 Políticas ({len(df_politicas)} registros)",
+            style={'fontSize': '13px', 'marginBottom': '4px', 'color': '#2c3e50'}
+        ),
+        html.P(
+            "Todos os registros de políticas (filtros não aplicados)",
+            style={'color': '#7f8c8d', 'marginBottom': '6px', 'fontSize': '9px'}
+        ),
+        tabela_politicas
+    ], style={
+        'marginTop': '12px',
+        'padding': '8px',
+        'backgroundColor': 'white',
+        'borderRadius': '4px',
+        'border': '1px solid #dde1e6',
+        'boxShadow': '0 1px 3px rgba(0,0,0,0.05)'
+    })
+
+    abas_extra.append(container_politicas)
 
     # ---------- Layout Final SUPER COMPACTO ----------
     return html.Div([
@@ -1849,5 +1862,6 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
 
 
