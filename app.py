@@ -1741,7 +1741,7 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
         
         # Selecionar colunas mais importantes para visualização
-         colunas_prioritarias = ['Nome da Politica', 'Unidade', 'Status', 'Responsavel', 'Unidade', 'Data de Implementação']
+        colunas_prioritarias = ['Nome da Politica', 'Unidade', 'Status', 'Responsavel', 'Unidade', 'Data de Implementação']
         colunas_disponiveis = [col for col in colunas_prioritarias if col in df_politicas_display.columns]
         
         # Adicionar outras colunas se houver espaço
@@ -1844,3 +1844,4 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
