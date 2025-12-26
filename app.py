@@ -1740,16 +1740,21 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             if coluna_data in df_politicas_display.columns:
                 df_politicas_display[coluna_data] = df_politicas_display[coluna_data].apply(formatar_data)
         
-        # Selecionar colunas mais importantes para visualização
-        colunas_prioritarias = ['Nome da Politica', 'Unidade', 'Status', 'Responsavel', 'Unidade', 'Data de Implementação']
-        colunas_disponiveis = [col for col in colunas_prioritarias if col in df_politicas_display.columns]
-        
-        # Adicionar outras colunas se houver espaço
-        outras_colunas = [col for col in df_politicas_display.columns if col not in colunas_disponiveis]
-        max_colunas = min(6, len(df_politicas_display.columns))
-        colunas_para_exibir = colunas_disponiveis + outras_colunas[:max_colunas - len(colunas_disponiveis)]
-        
-        df_politicas_display = df_politicas_display[colunas_para_exibir]
+        # Selecionar APENAS as colunas prioritárias existentes
+colunas_prioritarias = [
+    'Nome da Politica',
+    'Unidade',
+    'Status',
+    'Responsavel',
+    'Data de Implementação'
+]
+
+colunas_para_exibir = [
+    col for col in colunas_prioritarias
+    if col in df_politicas_display.columns
+]
+
+df_politicas_display = df_politicas_display[colunas_para_exibir]
         
         # Calcular altura dinâmica baseada no número de registros
         num_registros = len(df_politicas_display)
@@ -1844,4 +1849,5 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
 
