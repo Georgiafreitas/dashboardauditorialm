@@ -1663,14 +1663,75 @@ def atualizar_conteudo_principal(ano, mes, unidade):
             if coluna_data in df_melhorias_display.columns:
                 df_melhorias_display[coluna_data] = df_melhorias_display[coluna_data].apply(formatar_data)
         
-        # Manter apenas colunas importantes para não sobrecarregar
-        colunas_prioritarias = ['Descricao', 'Status', 'Unidade', 'Responsavel', 'Prazo']
-        df_melhorias_display = df_melhorias_display[
-            [col for col in colunas_prioritarias if col in df_melhorias_display.columns]
-        ]
+        # ENCONTRAR COLUNAS DE STATUS E OBSERVAÇÃO
+        colunas_status = [col for col in df_melhorias_display.columns if 'status' in col.lower()]
+        colunas_observacao = [col for col in df_melhorias_display.columns if any(termo in col.lower() for termo in ['observacao', 'obs', 'comentario', 'nota'])]
+        
+        print(f"  🔍 Colunas de Status encontradas: {colunas_status}")
+        print(f"  🔍 Colunas de Observação encontradas: {colunas_observacao}")
+        
+        # Garantir que Status seja uma coluna
+        if colunas_status:
+            coluna_status = colunas_status[0]
+            print(f"  ✅ Usando coluna de Status: '{coluna_status}'")
+        else:
+            print(f"  ⚠️ Nenhuma coluna de Status encontrada, criando padrão")
+            df_melhorias_display['Status'] = 'Sem Status'
+            coluna_status = 'Status'
+        
+        # Garantir que Observação seja uma coluna
+        if colunas_observacao:
+            coluna_observacao = colunas_observacao[0]
+            print(f"  ✅ Usando coluna de Observação: '{coluna_observacao}'")
+        else:
+            print(f"  ⚠️ Nenhuma coluna de Observação encontrada, criando padrão")
+            df_melhorias_display['Observacao'] = 'Sem Observação'
+            coluna_observacao = 'Observacao'
+        
+        # MOSTRAR TODAS AS COLUNAS (exceto as temporárias)
+        colunas_excluidas = ['Ano', 'Mes', 'Mes_Ano']
+        colunas_para_mostrar = [col for col in df_melhorias_display.columns if col not in colunas_excluidas]
+        
+        # Garantir que Status e Observação estejam no final para melhor visualização
+        if coluna_status in colunas_para_mostrar:
+            colunas_para_mostrar.remove(coluna_status)
+            colunas_para_mostrar.append(coluna_status)
+        
+        if coluna_observacao in colunas_para_mostrar:
+            colunas_para_mostrar.remove(coluna_observacao)
+            colunas_para_mostrar.append(coluna_observacao)
+        
+        # Limitar a 10 colunas se tiver muitas
+        if len(colunas_para_mostrar) > 10:
+            print(f"⚠️ Muitas colunas ({len(colunas_para_mostrar)}). Mantendo Status e Observação, reduzindo outras.")
+            # Manter as colunas essenciais
+            colunas_essenciais = ['Descricao', 'Unidade', coluna_status, coluna_observacao]
+            colunas_adicionais = [col for col in colunas_para_mostrar if col not in colunas_essenciais][:6]
+            colunas_para_mostrar = colunas_essenciais + colunas_adicionais
+        
+        df_melhorias_display = df_melhorias_display[colunas_para_mostrar]
         
         num_registros = len(df_melhorias_display)
-        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
+        altura_tabela = 'auto' if num_registros <= 10 else min(350, 150 + (num_registros * 30))
+        
+        # Configurar cores condicionais para Status
+        style_data_conditional = [
+            {'if': {'row_index': 'odd'}, 'backgroundColor': '#e8f4fd'},
+            {'if': {'row_index': 'even'}, 'backgroundColor': '#f0f8ff'}
+        ]
+        
+        # Adicionar cores baseadas no status
+        for status_val, cor in [('Conforme', '#d4edda'), 
+                                ('Conforme Parcialmente', '#fff3cd'),
+                                ('Não Conforme', '#f8d7da'),
+                                ('Pendente', '#fff8e1'),
+                                ('Finalizado', '#d1ecf1')]:
+            style_data_conditional.append({
+                'if': {
+                    'filter_query': f'{{{coluna_status}}} = "{status_val}"',
+                },
+                'backgroundColor': cor
+            })
         
         tabela_melhorias = dash_table.DataTable(
             columns=[{"name": col, "id": col} for col in df_melhorias_display.columns],
@@ -1700,12 +1761,15 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'overflow': 'hidden',
                 'textOverflow': 'ellipsis'
             },
+            style_data_conditional=style_data_conditional,
             page_action='none' if num_registros <= 15 else 'native'
         )
         
         container_melhorias = html.Div([
             html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)", 
                    style={'fontSize': '13px', 'marginBottom': '5px'}),
+            html.P(f"Mostrando {len(colunas_para_mostrar)} colunas • Status: '{coluna_status}' • Observação: '{coluna_observacao}'", 
+                   style={'fontSize': '9px', 'color': '#7f8c8d', 'marginBottom': '3px'}),
             tabela_melhorias
         ], style={'marginTop': '12px'})
         
@@ -1731,20 +1795,75 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                     .apply(formatar_data)
                 )
 
-        colunas_prioritarias = [
-            'Nome da Politica',
-            'Status',
-            'Responsavel',
-            'Unidade',
-            'Data de Implementação'
-        ]
+        # ENCONTRAR COLUNAS DE STATUS E OBSERVAÇÃO
+        colunas_status_politicas = [col for col in df_politicas_display.columns if 'status' in col.lower()]
+        colunas_observacao_politicas = [col for col in df_politicas_display.columns if any(termo in col.lower() for termo in ['observacao', 'obs', 'comentario', 'nota'])]
+        
+        print(f"  🔍 Colunas de Status encontradas (Políticas): {colunas_status_politicas}")
+        print(f"  🔍 Colunas de Observação encontradas (Políticas): {colunas_observacao_politicas}")
+        
+        # Garantir que Status seja uma coluna
+        if colunas_status_politicas:
+            coluna_status_politicas = colunas_status_politicas[0]
+            print(f"  ✅ Usando coluna de Status: '{coluna_status_politicas}'")
+        else:
+            print(f"  ⚠️ Nenhuma coluna de Status encontrada em Políticas, criando padrão")
+            df_politicas_display['Status'] = 'Sem Status'
+            coluna_status_politicas = 'Status'
+        
+        # Garantir que Observação seja uma coluna
+        if colunas_observacao_politicas:
+            coluna_observacao_politicas = colunas_observacao_politicas[0]
+            print(f"  ✅ Usando coluna de Observação: '{coluna_observacao_politicas}'")
+        else:
+            print(f"  ⚠️ Nenhuma coluna de Observação encontrada em Políticas, criando padrão")
+            df_politicas_display['Observacao'] = 'Sem Observação'
+            coluna_observacao_politicas = 'Observacao'
 
-        df_politicas_display = df_politicas_display[
-            [col for col in colunas_prioritarias if col in df_politicas_display.columns]
-        ]
+        # MOSTRAR TODAS AS COLUNAS (exceto as temporárias)
+        colunas_excluidas_politicas = ['Ano', 'Mes', 'Mes_Ano']
+        colunas_para_mostrar_politicas = [col for col in df_politicas_display.columns if col not in colunas_excluidas_politicas]
+        
+        # Garantir que Status e Observação estejam no final para melhor visualização
+        if coluna_status_politicas in colunas_para_mostrar_politicas:
+            colunas_para_mostrar_politicas.remove(coluna_status_politicas)
+            colunas_para_mostrar_politicas.append(coluna_status_politicas)
+        
+        if coluna_observacao_politicas in colunas_para_mostrar_politicas:
+            colunas_para_mostrar_politicas.remove(coluna_observacao_politicas)
+            colunas_para_mostrar_politicas.append(coluna_observacao_politicas)
+        
+        # Limitar a 10 colunas se tiver muitas
+        if len(colunas_para_mostrar_politicas) > 10:
+            print(f"⚠️ Muitas colunas em Políticas ({len(colunas_para_mostrar_politicas)}). Mantendo Status e Observação, reduzindo outras.")
+            # Manter as colunas essenciais
+            colunas_essenciais_politicas = ['Nome da Politica', 'Unidade', coluna_status_politicas, coluna_observacao_politicas]
+            colunas_adicionais_politicas = [col for col in colunas_para_mostrar_politicas if col not in colunas_essenciais_politicas][:6]
+            colunas_para_mostrar_politicas = colunas_essenciais_politicas + colunas_adicionais_politicas
+        
+        df_politicas_display = df_politicas_display[colunas_para_mostrar_politicas]
 
         num_registros = len(df_politicas_display)
-        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
+        altura_tabela = 'auto' if num_registros <= 10 else min(350, 150 + (num_registros * 30))
+
+        # Configurar cores condicionais para Status
+        style_data_conditional_politicas = [
+            {'if': {'row_index': 'odd'}, 'backgroundColor': '#f0f3f4'},
+            {'if': {'row_index': 'even'}, 'backgroundColor': '#f8f9fa'}
+        ]
+        
+        # Adicionar cores baseadas no status
+        for status_val, cor in [('Conforme', '#d4edda'), 
+                                ('Conforme Parcialmente', '#fff3cd'),
+                                ('Não Conforme', '#f8d7da'),
+                                ('Pendente', '#fff8e1'),
+                                ('Finalizado', '#d1ecf1')]:
+            style_data_conditional_politicas.append({
+                'if': {
+                    'filter_query': f'{{{coluna_status_politicas}}} = "{status_val}"',
+                },
+                'backgroundColor': cor
+            })
 
         tabela_politicas = dash_table.DataTable(
             columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
@@ -1774,12 +1893,15 @@ def atualizar_conteudo_principal(ano, mes, unidade):
                 'overflow': 'hidden',
                 'textOverflow': 'ellipsis'
             },
+            style_data_conditional=style_data_conditional_politicas,
             page_action='none' if num_registros <= 15 else 'native'
         )
 
         container_politicas = html.Div([
             html.H3(f"📑 Políticas ({len(df_politicas)} registros)", 
                    style={'fontSize': '13px', 'marginBottom': '5px'}),
+            html.P(f"Mostrando {len(colunas_para_mostrar_politicas)} colunas • Status: '{coluna_status_politicas}' • Observação: '{coluna_observacao_politicas}'", 
+                   style={'fontSize': '9px', 'color': '#7f8c8d', 'marginBottom': '3px'}),
             tabela_politicas
         ], style={'marginTop': '12px'})
 
@@ -1812,7 +1934,7 @@ if __name__ == '__main__':
     print("  - ✅ KPIs mais compactos (espaçamento reduzido)")
     print("  - ✅ Tabela de Não Conformes maior (300px de altura)")
     print("  - ✅ Legenda de siglas compacta (uma ao lado da outra)")
-    print("  - ✅ Tabelas de Melhorias e Políticas mostrando tudo")
+    print("  - ✅ Tabelas de Melhorias e Políticas com Status e Observação SEPARADOS")
     print("  - ✅ Fontes reduzidas para otimizar espaço")
     print("  - ✅ Layout mais compacto geral")
     print("="*50)
@@ -1820,3 +1942,4 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
+
