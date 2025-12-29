@@ -448,7 +448,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                                 style={
                                     'fontSize': '6px',
                                     'fontWeight': '600',
-                                    'color': item['cor']['text_color',
+                                    'color': item['cor']['text_color'],
                                     'textAlign': 'center',
                                     'backgroundColor': item['cor']['bg_color'],
                                     'padding': '1px 2px',
@@ -1820,7 +1820,3 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
-
-
-
