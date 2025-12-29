@@ -448,7 +448,7 @@ def criar_matriz_risco_anual(df_risco_filtrado, ano_filtro):
                                 style={
                                     'fontSize': '6px',
                                     'fontWeight': '600',
-                                    'color': item['cor']['text_color'],
+                                    'color': item['cor']['text_color',
                                     'textAlign': 'center',
                                     'backgroundColor': item['cor']['bg_color'],
                                     'padding': '1px 2px',
@@ -1648,134 +1648,142 @@ def atualizar_conteudo_principal(ano, mes, unidade):
         ], style={'marginTop':'12px', 'height': '150px', 'display': 'flex', 'flexDirection': 'column', 'justifyContent': 'center'}))
 
     # ---------- Melhorias (8 registros) - MOSTRAR TODOS COMPACTOS ----------
-    # GARANTA QUE ESTE BLOCO ESTEJA NO MESMO NÍVEL DOS OUTROS ifs
-if df_politicas is not None and len(df_politicas) > 0:
-    print(f"\n📑 PROCESSANDO POLÍTICAS: {len(df_politicas)} registros")
-
-    colunas_data_politicas = [
-        col for col in df_politicas.columns
-        if any(termo in col.lower() for termo in [
-            'data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'
-        ])
-    ]
-
-    df_politicas_display = df_politicas.copy()
-
-    for coluna_data in colunas_data_politicas:
-        if coluna_data in df_politicas_display.columns:
-            df_politicas_display[coluna_data] = (
-                df_politicas_display[coluna_data]
-                .apply(formatar_data)
-            )
-
-    colunas_prioritarias = [
-        'Nome da Politica',
-        'Status',
-        'Responsavel',
-        'Unidade',
-        'Data de Implementação'
-    ]
-
-    df_politicas_display = df_politicas_display[
-        [col for col in colunas_prioritarias if col in df_politicas_display.columns]
-    ]
-
-    num_registros = len(df_politicas_display)
-    altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
-
-    tabela_politicas = dash_table.DataTable(
-        columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
-        data=df_politicas_display.to_dict('records'),
-        page_size=10,
-        style_table={
-            'overflowX': 'auto',
-            'marginTop': '5px',
-            'fontSize': '10px',
-            'height': altura_tabela
-        },
-        style_header={
-            'backgroundColor': '#34495e',
-            'color': 'white',
-            'fontWeight': 'bold',
-            'textAlign': 'center',
-            'fontSize': '10px',
-            'padding': '4px 5px',
-            'height': '30px'
-        },
-        style_cell={
-            'textAlign': 'center',
-            'padding': '3px 4px',
-            'whiteSpace': 'normal',
-            'fontSize': '9px',
-            'maxWidth': '200px',
-            'overflow': 'hidden',
-            'textOverflow': 'ellipsis'
-        },
-        page_action='none' if num_registros <= 15 else 'native'
-    )
-
-    container_politicas = html.Div([
-        html.H3(f"📑 Políticas ({len(df_politicas)} registros)"),
-        tabela_politicas
-    ])
-
-    abas_extra.append(container_politicas)
+    if df_melhorias is not None and len(df_melhorias) > 0:
+        print(f"\n📈 PROCESSANDO MELHORIAS: {len(df_melhorias)} registros")
+        
+        # Formatar datas
+        colunas_data_melhorias = [
+            col for col in df_melhorias.columns 
+            if any(termo in col.lower() for termo in ['data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'])
+        ]
+        
+        df_melhorias_display = df_melhorias.copy()
+        
+        for coluna_data in colunas_data_melhorias:
+            if coluna_data in df_melhorias_display.columns:
+                df_melhorias_display[coluna_data] = df_melhorias_display[coluna_data].apply(formatar_data)
+        
+        # Manter apenas colunas importantes para não sobrecarregar
+        colunas_prioritarias = ['Descricao', 'Status', 'Unidade', 'Responsavel', 'Prazo']
+        df_melhorias_display = df_melhorias_display[
+            [col for col in colunas_prioritarias if col in df_melhorias_display.columns]
+        ]
+        
+        num_registros = len(df_melhorias_display)
+        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
+        
+        tabela_melhorias = dash_table.DataTable(
+            columns=[{"name": col, "id": col} for col in df_melhorias_display.columns],
+            data=df_melhorias_display.to_dict('records'),
+            page_size=10,
+            style_table={
+                'overflowX': 'auto', 
+                'marginTop': '5px', 
+                'fontSize': '10px',
+                'height': altura_tabela
+            },
+            style_header={
+                'backgroundColor': '#2980b9',
+                'color': 'white',
+                'fontWeight': 'bold',
+                'textAlign': 'center',
+                'fontSize': '10px',
+                'padding': '4px 5px',
+                'height': '30px'
+            },
+            style_cell={
+                'textAlign': 'center',
+                'padding': '3px 4px',
+                'whiteSpace': 'normal',
+                'fontSize': '9px',
+                'maxWidth': '200px',
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis'
+            },
+            page_action='none' if num_registros <= 15 else 'native'
+        )
+        
+        container_melhorias = html.Div([
+            html.H3(f"📈 Melhorias ({len(df_melhorias)} registros)", 
+                   style={'fontSize': '13px', 'marginBottom': '5px'}),
+            tabela_melhorias
+        ], style={'marginTop': '12px'})
+        
+        abas_extra.append(container_melhorias)
 
     # ---------- Políticas (7 registros) - MOSTRAR TODOS COMPACTOS ----------
-   # ---------- Políticas (7 registros) - MOSTRAR TODOS COMPACTOS ----------
-if df_politicas is not None and len(df_politicas) > 0:
-    print(f"\n📑 PROCESSANDO POLÍTICAS: {len(df_politicas)} registros")
+    if df_politicas is not None and len(df_politicas) > 0:
+        print(f"\n📑 PROCESSANDO POLÍTICAS: {len(df_politicas)} registros")
 
-    colunas_data_politicas = [
-        col for col in df_politicas.columns
-        if any(termo in col.lower() for termo in [
-            'data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'
-        ])
-    ]
+        colunas_data_politicas = [
+            col for col in df_politicas.columns
+            if any(termo in col.lower() for termo in [
+                'data', 'prazo', 'vencimento', 'limite', 'criacao', 'conclusao'
+            ])
+        ]
 
-    df_politicas_display = df_politicas.copy()
+        df_politicas_display = df_politicas.copy()
 
-    for coluna_data in colunas_data_politicas:
-        if coluna_data in df_politicas_display.columns:
-            df_politicas_display[coluna_data] = (
-                df_politicas_display[coluna_data]
-                .apply(formatar_data)
-            )
+        for coluna_data in colunas_data_politicas:
+            if coluna_data in df_politicas_display.columns:
+                df_politicas_display[coluna_data] = (
+                    df_politicas_display[coluna_data]
+                    .apply(formatar_data)
+                )
 
-    colunas_prioritarias = [
-        'Nome da Politica',
-        'Status',
-        'Responsavel',
-        'Unidade',
-        'Data de Implementação'
-    ]
+        colunas_prioritarias = [
+            'Nome da Politica',
+            'Status',
+            'Responsavel',
+            'Unidade',
+            'Data de Implementação'
+        ]
 
-    df_politicas_display = df_politicas_display[
-        [col for col in colunas_prioritarias if col in df_politicas_display.columns]
-    ]
+        df_politicas_display = df_politicas_display[
+            [col for col in colunas_prioritarias if col in df_politicas_display.columns]
+        ]
 
-    num_registros = len(df_politicas_display)
-    altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
+        num_registros = len(df_politicas_display)
+        altura_tabela = 'auto' if num_registros <= 10 else min(250, 100 + (num_registros * 40))
 
-    tabela_politicas = dash_table.DataTable(
-        columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
-        data=df_politicas_display.to_dict('records'),
-        page_size=10,
-        style_table={
-            'overflowX': 'auto',
-            'marginTop': '5px',
-            'fontSize': '10px',
-            'height': altura_tabela
-        },
-        page_action='none'
-    )
+        tabela_politicas = dash_table.DataTable(
+            columns=[{"name": col, "id": col} for col in df_politicas_display.columns],
+            data=df_politicas_display.to_dict('records'),
+            page_size=10,
+            style_table={
+                'overflowX': 'auto',
+                'marginTop': '5px',
+                'fontSize': '10px',
+                'height': altura_tabela
+            },
+            style_header={
+                'backgroundColor': '#34495e',
+                'color': 'white',
+                'fontWeight': 'bold',
+                'textAlign': 'center',
+                'fontSize': '10px',
+                'padding': '4px 5px',
+                'height': '30px'
+            },
+            style_cell={
+                'textAlign': 'center',
+                'padding': '3px 4px',
+                'whiteSpace': 'normal',
+                'fontSize': '9px',
+                'maxWidth': '200px',
+                'overflow': 'hidden',
+                'textOverflow': 'ellipsis'
+            },
+            page_action='none' if num_registros <= 15 else 'native'
+        )
 
-    container_politicas = html.Div([
-        html.H3(f"📑 Políticas ({len(df_politicas)} registros)"),
-        tabela_politicas
-    ])
+        container_politicas = html.Div([
+            html.H3(f"📑 Políticas ({len(df_politicas)} registros)", 
+                   style={'fontSize': '13px', 'marginBottom': '5px'}),
+            tabela_politicas
+        ], style={'marginTop': '12px'})
 
-    abas_extra.append(container_politicas)
+        abas_extra.append(container_politicas)
 
     # ---------- Layout Final SUPER COMPACTO ----------
     return html.Div([
@@ -1812,7 +1820,6 @@ if __name__ == '__main__':
 
 # ========== SERVER PARA O RENDER ==========
 server = app.server
-
 
 
 
